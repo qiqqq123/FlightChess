@@ -94,6 +94,9 @@ function createRoom(mode, playerName, password = null, options = {}) {
     difficulty = options.difficulty;
   }
 
+  // 是否公开
+  const isPublic = options.isPublic === true;
+
   const roomCode = generateRoomCode();
 
   // 验证房间码唯一性
@@ -130,6 +133,7 @@ function createRoom(mode, playerName, password = null, options = {}) {
     shortCode: generateShortCode(roomCode),
     mode: mode,
     password: validatedPassword,
+    isPublic: isPublic,
     players: [player],
     maxPlayers: maxPlayers,
     turnDuration: turnDuration,
@@ -558,6 +562,29 @@ function getRoomColors(roomCode) {
   };
 }
 
+// 获取所有公开房间（未开始的）
+function getPublicRooms() {
+  const publicRooms = [];
+  for (const [code, room] of rooms) {
+    if (room.isPublic && (room.gameState === 'waiting' || room.gameState === 'selecting')) {
+      publicRooms.push({
+        code: room.code,
+        shortCode: room.shortCode,
+        mode: room.mode,
+        playerCount: room.players.length,
+        maxPlayers: room.maxPlayers,
+        difficulty: room.difficulty,
+        hasPassword: !!room.password,
+        isPublic: room.isPublic,
+        createdAt: room.createdAt
+      });
+    }
+  }
+  // 按创建时间倒序排列
+  publicRooms.sort((a, b) => b.createdAt - a.createdAt);
+  return publicRooms.slice(0, 20); // 最多返回20个
+}
+
 // 清理过期房间
 function cleanupExpiredRooms() {
   const now = Date.now();
@@ -586,6 +613,7 @@ module.exports = {
   setTaskPackage,
   startGame,
   getAllRooms,
+  getPublicRooms,
   choosePlayerColor,
   resetPassword,
   setDifficulty,

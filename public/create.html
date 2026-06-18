@@ -84,6 +84,24 @@
             </select>
           </div>
 
+          <div>
+            <label class="block text-gray-400 mb-2 text-sm">房间可见性</label>
+            <div class="flex gap-4 mt-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="is-public" value="true" checked class="w-5 h-5 accent-purple-500" />
+                <span>🌐 公开房间</span>
+                <span class="text-xs text-gray-500">(显示在房间列表)</span>
+              </label>
+            </div>
+            <div class="flex gap-4 mt-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="is-public" value="false" class="w-5 h-5 accent-purple-500" />
+                <span>🔒 私密房间</span>
+                <span class="text-xs text-gray-500">(不在列表显示)</span>
+              </label>
+            </div>
+          </div>
+
           <button onclick="createRoom()" class="btn w-full bg-green-600 hover:bg-green-700 py-4 rounded-xl text-lg font-semibold mt-4">
             🎮 创建房间
           </button>
@@ -185,6 +203,7 @@
       const difficulty = document.getElementById('difficulty-select').value;
       const turnDuration = parseInt(document.getElementById('turn-duration-select').value);
       let maxPlayers = parseInt(document.getElementById('max-players-select').value);
+      const isPublic = document.querySelector('input[name="is-public"]:checked').value === 'true';
 
       // 情侣模式强制2人
       if (mode === 'couple') maxPlayers = 2;
@@ -200,7 +219,8 @@
           maxPlayers: maxPlayers,
           turnDuration: turnDuration,
           difficulty: difficulty,
-          pieceColor: selectedColor
+          pieceColor: selectedColor,
+          isPublic: isPublic
         }
       });
     }

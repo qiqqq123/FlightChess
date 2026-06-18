@@ -591,6 +591,12 @@ app.post('/api/task-packages', (req, res) => {
   res.json(result);
 });
 
+// 获取公开房间列表
+app.get('/api/rooms/public', (req, res) => {
+  const rooms = roomModule.getPublicRooms();
+  res.json({ success: true, rooms });
+});
+
 // 短码解析
 app.get('/api/short-code/:code', (req, res) => {
   const { code } = req.params;
