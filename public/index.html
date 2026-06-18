@@ -3,121 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="format-detection" content="telephone=no">
-  <title>飞行棋联机版</title>
+  <title>飞行棋 - 首页</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
       padding: 0;
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
       min-height: 100vh;
-      overflow-x: hidden;
     }
-    .page { display: none; }
-    .page.active { display: block; }
-    .btn {
-      transition: all 0.2s ease;
-      touch-action: manipulation;
-    }
+    .btn { transition: all 0.2s; touch-action: manipulation; }
     .btn:active { transform: scale(0.96); }
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .modal.active { display: flex; }
-    .modal-content {
-      background: #1a1a2e;
-      border: 2px solid #533483;
-      border-radius: 1rem;
-      max-width: 90vw;
-      max-height: 90vh;
-      overflow: auto;
-    }
-    .player-piece {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      color: white;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-    .player-piece:hover { transform: scale(1.1); }
-    .player-piece.red { background: #E53935; box-shadow: 0 0 10px #E53935; }
-    .player-piece.blue { background: #1E88E5; box-shadow: 0 0 10px #1E88E5; }
-    .player-piece.yellow { background: #FDD835; box-shadow: 0 0 10px #FDD835; color: #333; }
-    .player-piece.green { background: #43A047; box-shadow: 0 0 10px #43A047; }
-    .dice {
-      width: 60px;
-      height: 60px;
-      background: white;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2rem;
-      font-weight: bold;
-      color: #1a1a2e;
-      cursor: pointer;
-      user-select: none;
-      transition: transform 0.1s;
-    }
-    .dice:active { transform: scale(0.9); }
-    .dice.rolling {
-      animation: dice-roll 0.3s infinite;
-    }
-    @keyframes dice-roll {
-      0%, 100% { transform: rotate(0deg); }
-      25% { transform: rotate(10deg); }
-      75% { transform: rotate(-10deg); }
-    }
-    .shake {
-      animation: shake 0.5s;
-    }
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-5px); }
-      75% { transform: translateX(5px); }
-    }
-    .fade-in {
-      animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .task-option {
-      background: #16213e;
-      border: 2px solid #0f3460;
-      border-radius: 0.75rem;
-      padding: 0.75rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .task-option:hover {
-      border-color: #533483;
-      background: #0f3460;
-    }
-    .task-option.selected {
-      border-color: #E53935;
-      background: #E53935;
-    }
-    input[type="text"], input[type="password"], textarea {
+    input, select {
       background: #16213e;
       border: 2px solid #0f3460;
       border-radius: 0.5rem;
@@ -126,44 +26,13 @@
       width: 100%;
       font-size: 1rem;
     }
-    input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
-      outline: none;
-      border-color: #533483;
-    }
-    .color-red { color: #E53935; }
-    .color-blue { color: #1E88E5; }
-    .color-yellow { color: #FDD835; }
-    .color-green { color: #43A047; }
-    .bg-red { background: #E53935; }
-    .bg-blue { background: #1E88E5; }
-    .bg-yellow { background: #FDD835; }
-    .bg-green { background: #43A047; }
-    .border-red { border-color: #E53935; }
-    .border-blue { border-color: #1E88E5; }
-    .border-yellow { border-color: #FDD835; }
-    .border-green { border-color: #43A047; }
-    #gameCanvas {
-      touch-action: none;
-    }
-    .task-list-item {
-      background: #16213e;
-      border: 1px solid #0f3460;
-      border-radius: 0.5rem;
-      padding: 0.75rem;
-      margin-bottom: 0.5rem;
-      cursor: pointer;
-    }
-    .task-list-item:hover {
-      border-color: #533483;
-    }
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #16213e; }
-    ::-webkit-scrollbar-thumb { background: #533483; border-radius: 4px; }
+    input:focus, select:focus { outline: none; border-color: #533483; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body class="text-white">
-  <!-- 首页 -->
-  <div id="page-home" class="page active min-h-screen flex flex-col items-center justify-center p-4">
+  <div class="min-h-screen flex flex-col items-center justify-center p-4">
     <div class="text-center mb-8">
       <h1 class="text-4xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 bg-clip-text text-transparent">
         飞行棋
@@ -172,365 +41,141 @@
     </div>
 
     <div class="w-full max-w-md space-y-4">
+      <!-- 模式选择 -->
       <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
         <h2 class="text-xl font-semibold mb-4 text-center">选择游戏模式</h2>
         <div class="grid grid-cols-2 gap-4">
-          <button onclick="showMode('couple')" class="btn bg-pink-600 hover:bg-pink-700 py-4 px-6 rounded-xl text-lg font-semibold flex flex-col items-center gap-2">
+          <a href="create.html?mode=couple" class="btn bg-pink-600 hover:bg-pink-700 py-4 px-6 rounded-xl text-lg font-semibold flex flex-col items-center gap-2 text-center">
             <span class="text-2xl">💑</span>
             <span>情侣私密</span>
             <span class="text-xs text-pink-200">2人密码房间</span>
-          </button>
-          <button onclick="showMode('multi')" class="btn bg-purple-600 hover:bg-purple-700 py-4 px-6 rounded-xl text-lg font-semibold flex flex-col items-center gap-2">
+          </a>
+          <a href="create.html?mode=multi" class="btn bg-purple-600 hover:bg-purple-700 py-4 px-6 rounded-xl text-lg font-semibold flex flex-col items-center gap-2 text-center">
             <span class="text-2xl">👥</span>
             <span>好友多人</span>
-            <span class="text-xs text-purple-200">2-4人自由加入</span>
-          </button>
+            <span class="text-xs text-purple-200">2-6人自由加入</span>
+          </a>
         </div>
       </div>
 
+      <!-- 加入房间 -->
       <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
         <h2 class="text-xl font-semibold mb-4 text-center">加入房间</h2>
         <div class="space-y-3">
           <input type="text" id="join-player-name" placeholder="你的昵称" maxlength="20" />
-          <input type="text" id="join-room-code" placeholder="输入房间码 (6位)" maxlength="6" class="text-center text-2xl tracking-widest uppercase" />
-          <input type="password" id="join-room-password" placeholder="密码(如有)" maxlength="20" />
-          <button onclick="joinRoom()" class="btn w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-xl text-lg font-semibold">
+          <input type="text" id="join-room-code" placeholder="输入房间码" maxlength="6" class="text-center text-2xl tracking-widest uppercase" />
+          <input type="password" id="join-room-password" placeholder="房间密码（如有）" maxlength="20" />
+          <button onclick="joinByCode()" class="btn w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-xl text-lg font-semibold">
             加入房间
           </button>
           <div class="text-center text-gray-400">或</div>
-          <input type="text" id="join-short-code" placeholder="输入短码 (如 ABCD-1234)" maxlength="9" class="text-center tracking-widest uppercase" />
-          <button onclick="joinRoomByShortCode()" class="btn w-full bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl text-lg font-semibold">
+          <input type="text" id="join-short-code" placeholder="输入短码" maxlength="9" class="text-center tracking-widest uppercase" />
+          <button onclick="joinByShortCode()" class="btn w-full bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl text-lg font-semibold">
             短码加入
           </button>
         </div>
       </div>
 
-      <button onclick="showEditor()" class="btn w-full bg-gray-700 hover:bg-gray-600 py-3 rounded-xl text-gray-300">
+      <a href="editor.html" class="btn w-full bg-gray-700 hover:bg-gray-600 py-3 rounded-xl text-gray-300 text-center block">
         📝 任务包编辑器
-      </button>
+      </a>
     </div>
   </div>
 
-  <!-- 创建房间页面 -->
-  <div id="page-create" class="page min-h-screen flex flex-col items-center justify-center p-4">
-    <div class="w-full max-w-md">
-      <button onclick="showPage('home')" class="btn text-gray-400 hover:text-white mb-4 flex items-center gap-2">
-        <span>←</span> 返回
-      </button>
-
-      <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
-        <h2 class="text-2xl font-semibold mb-6 text-center" id="create-title">创建房间</h2>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-gray-400 mb-2 text-sm">你的昵称</label>
-            <input type="text" id="player-name" placeholder="输入昵称" maxlength="20" />
-          </div>
-
-          <div>
-            <label class="block text-gray-400 mb-2 text-sm">房间密码 (6-10位字母+数字)</label>
-            <input type="password" id="room-password" placeholder="自定义密码 (可选)" maxlength="20" />
-          </div>
-
-          <div>
-            <label class="block text-gray-400 mb-2 text-sm">难度</label>
-            <select id="difficulty-select" class="w-full bg-[#16213e] border-2 border-[#0f3460] rounded-lg p-3 text-white text-base">
-              <option value="easy">休闲模式（任务简单）</option>
-              <option value="normal" selected>团建模式（均衡难度）</option>
-              <option value="hard">竞技模式（高难度挑战）</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-gray-400 mb-2 text-sm">回合时长 (秒)</label>
-            <select id="turn-duration-select" class="w-full bg-[#16213e] border-2 border-[#0f3460] rounded-lg p-3 text-white text-base">
-              <option value="15">15秒</option>
-              <option value="30">30秒</option>
-              <option value="45" selected>45秒</option>
-              <option value="60">60秒</option>
-              <option value="90">90秒</option>
-              <option value="120">120秒</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-gray-400 mb-2 text-sm">最大人数</label>
-            <select id="max-players-select" class="w-full bg-[#16213e] border-2 border-[#0f3460] rounded-lg p-3 text-white text-base">
-              <option value="2">2人</option>
-              <option value="3">3人</option>
-              <option value="4" selected>4人</option>
-              <option value="5">5人</option>
-              <option value="6">6人</option>
-            </select>
-          </div>
-
-          <div class="flex gap-2 pt-2">
-            <button onclick="createRoom()" class="btn flex-1 bg-green-600 hover:bg-green-700 py-3 rounded-xl text-lg font-semibold">
-              创建房间
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- 错误提示 -->
+  <div id="error-toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg hidden">
+    <span id="error-message"></span>
   </div>
 
-  <!-- 等待室页面 -->
-  <div id="page-waiting" class="page min-h-screen p-4">
-    <div class="max-w-2xl mx-auto">
-      <div class="text-center mb-6">
-        <h2 class="text-2xl font-bold mb-2">等待房间</h2>
-        <div class="bg-gray-800 rounded-xl p-4 inline-block">
-          <div class="text-sm text-gray-400 mb-1">房间码</div>
-          <div class="text-3xl font-bold tracking-widest" id="room-code-display">------</div>
-          <div class="text-sm text-gray-400 mt-3 mb-1">短码</div>
-          <div class="text-xl font-semibold text-yellow-400" id="short-code-display">----</div>
-        </div>
-      </div>
-
-      <div class="text-center mb-4">
-        <button onclick="copyRoomCode()" class="btn bg-gray-700 hover:bg-gray-600 py-2 px-4 rounded-lg text-sm">
-          📋 复制房间码
-        </button>
-        <button onclick="copyShortCode()" class="btn bg-gray-700 hover:bg-gray-600 py-2 px-4 rounded-lg text-sm ml-2">
-          🔗 复制短码
-        </button>
-      </div>
-
-      <!-- 房间设置信息 -->
-      <div class="bg-gray-800/50 rounded-2xl p-4 border border-gray-700 mb-4 text-sm">
-        <div class="grid grid-cols-2 gap-3">
-          <div><span class="text-gray-400">难度:</span> <span id="difficulty-display" class="font-semibold">普通</span></div>
-          <div><span class="text-gray-400">回合时长:</span> <span id="turn-duration-display" class="font-semibold">45秒</span></div>
-          <div><span class="text-gray-400">最大人数:</span> <span id="max-players" class="font-semibold">4</span></div>
-          <div><span class="text-gray-400">密码:</span> <span id="password-display" class="font-semibold">无</span></div>
-        </div>
-      </div>
-
-      <!-- 玩家列表 -->
-      <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700 mb-4">
-        <h3 class="text-lg font-semibold mb-4">玩家列表 (<span id="player-count">0</span>/<span id="max-players-2">4</span>)</h3>
-        <div id="player-list" class="space-y-3"></div>
-      </div>
-
-      <!-- 房主控制 -->
-      <div id="owner-controls" class="space-y-3 hidden">
-        <div class="bg-gray-800/50 rounded-2xl p-4 border border-gray-700">
-          <h3 class="text-lg font-semibold mb-3">房间设置 (房主)</h3>
-          <div class="space-y-3">
-            <div class="grid grid-cols-3 gap-3">
-              <div>
-                <label class="block text-xs text-gray-400 mb-1">难度</label>
-                <select id="difficulty-select-owner" onchange="setRoomDifficulty()" class="w-full bg-[#16213e] border-2 border-[#0f3460] rounded-lg p-2 text-white text-sm">
-                  <option value="easy">休闲</option>
-                  <option value="normal" selected>团建</option>
-                  <option value="hard">竞技</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-400 mb-1">回合时长</label>
-                <select id="turn-duration-select-owner" onchange="setRoomTurnDuration()" class="w-full bg-[#16213e] border-2 border-[#0f3460] rounded-lg p-2 text-white text-sm">
-                  <option value="15">15秒</option>
-                  <option value="30">30秒</option>
-                  <option value="45" selected>45秒</option>
-                  <option value="60">60秒</option>
-                  <option value="90">90秒</option>
-                  <option value="120">120秒</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-400 mb-1">最大人数</label>
-                <select id="max-players-select-owner" onchange="setRoomMaxPlayers()" class="w-full bg-[#16213e] border-2 border-[#0f3460] rounded-lg p-2 text-white text-sm">
-                  <option value="2">2人</option>
-                  <option value="3">3人</option>
-                  <option value="4" selected>4人</option>
-                  <option value="5">5人</option>
-                  <option value="6">6人</option>
-                </select>
-              </div>
-            </div>
-            <button onclick="resetRoomPassword()" class="btn w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded-lg text-sm">
-              🔐 重置房间密码
-            </button>
-          </div>
-        </div>
-
-        <button onclick="startGame()" class="btn w-full bg-green-600 hover:bg-green-700 py-4 rounded-xl text-xl font-bold">
-          🎮 开始游戏
-        </button>
-        <button onclick="showTaskPackageSelector()" class="btn w-full bg-purple-600 hover:bg-purple-700 py-3 rounded-xl">
-          📦 选择任务包
-        </button>
-      </div>
-
-      <!-- 非房主提示 -->
-      <div id="player-info" class="text-center text-gray-400 text-sm hidden">
-        等待房主开始游戏...
-      </div>
-
-      <button onclick="leaveRoom()" class="btn w-full mt-4 bg-red-600/50 hover:bg-red-600 py-3 rounded-xl text-gray-300">
-        离开房间
-      </button>
-    </div>
-  </div>
-
-  <!-- 游戏页面 -->
-  <div id="page-game" class="page min-h-screen flex flex-col">
-    <div class="p-2 flex justify-between items-center bg-gray-900/50">
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-gray-400">房间:</span>
-        <span class="font-bold text-sm" id="game-room-code">------</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-gray-400" id="turn-timer-display"></span>
-        <button onclick="showGameMenu()" class="btn bg-gray-700 py-1 px-3 rounded text-sm">☰</button>
-      </div>
-    </div>
-
-    <div class="flex-1 flex flex-col items-center justify-center p-2">
-      <canvas id="gameCanvas" class="max-w-full max-h-[55vh]"></canvas>
-    </div>
-
-    <div class="bg-gray-900/80 p-4">
-      <div id="turn-indicator" class="text-center mb-4">
-        <span class="text-sm text-gray-400">等待投骰子...</span>
-      </div>
-
-      <div class="flex justify-center items-center gap-4">
-        <div id="dice-container" class="dice" onclick="rollDice()">?</div>
-      </div>
-
-      <div id="movable-pieces" class="flex justify-center gap-4 mt-4"></div>
-
-      <!-- 移动/出发按钮 -->
-      <div id="action-buttons" class="flex justify-center gap-3 mt-4 hidden">
-        <button id="move-piece-btn" onclick="movePiece()" class="btn bg-green-600 hover:bg-green-700 py-3 px-6 rounded-xl text-lg font-semibold">
-          前进
-        </button>
-        <button id="leave-base-btn" onclick="movePiece()" class="btn bg-blue-600 hover:bg-blue-700 py-3 px-6 rounded-xl text-lg font-semibold hidden">
-          出发
-        </button>
-      </div>
-
-      <div id="task-panel" class="hidden mt-4 bg-gray-800 rounded-xl p-4 border border-purple-600">
-        <div class="text-center mb-3">
-          <span class="text-purple-400 text-sm">⚡ 任务挑战</span>
-        </div>
-        <div id="task-content" class="text-center mb-4"></div>
-        <div id="task-options" class="space-y-2"></div>
-        <div class="flex gap-2 mt-3">
-          <button id="task-action-btn" onclick="completeTask(true)" class="btn flex-1 bg-purple-600 py-2 rounded-lg hidden">
-            我已完成动作
-          </button>
-          <button onclick="skipTask()" class="btn bg-gray-700 py-2 px-4 rounded-lg text-sm">
-            跳过(惩罚)
-          </button>
-        </div>
-      </div>
-
-      <div id="chat-bar" class="flex gap-2 mt-4">
-        <input type="text" id="chat-input" placeholder="发送消息..." maxlength="50" class="flex-1" />
-        <button onclick="sendChat()" class="btn bg-blue-600 px-4 rounded-lg">发送</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 任务包编辑器页面 -->
-  <div id="page-editor" class="page min-h-screen p-4">
-    <div class="max-w-4xl mx-auto">
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold">📝 任务包编辑器</h2>
-        <button onclick="showPage('home')" class="btn text-gray-400 hover:text-white">返回</button>
-      </div>
-
-      <div class="grid md:grid-cols-3 gap-4">
-        <div class="md:col-span-1 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-          <h3 class="font-semibold mb-3">任务包列表</h3>
-          <div id="package-list" class="space-y-2 max-h-[50vh] overflow-auto"></div>
-          <button onclick="createNewPackage()" class="btn w-full mt-3 bg-green-600 py-2 rounded-lg">+ 新建任务包</button>
-        </div>
-
-        <div class="md:col-span-2 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-          <div id="editor-content">
-            <div class="text-center text-gray-400 py-8">
-              选择或创建一个任务包开始编辑
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-4 flex gap-2">
-        <button onclick="importPackage()" class="btn bg-blue-600 py-2 px-4 rounded-lg">📥 导入JSON</button>
-        <button onclick="exportCurrentPackage()" class="btn bg-purple-600 py-2 px-4 rounded-lg">📤 导出JSON</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 模态框 -->
-  <div id="modal-share" class="modal">
-    <div class="modal-content p-6 w-80 text-center">
-      <h3 class="text-xl font-bold mb-4">分享房间</h3>
-      <p class="text-sm text-gray-400 mb-4">复制以下短码分享给朋友</p>
-      <div class="bg-gray-900 rounded-lg p-4 mb-4">
-        <div class="text-2xl font-bold tracking-widest" id="short-code-display">----</div>
-      </div>
-      <button onclick="copyShortCode()" class="btn w-full bg-blue-600 py-3 rounded-lg mb-2">📋 复制短码</button>
-      <button onclick="hideShareModal()" class="btn w-full bg-gray-700 py-2 rounded-lg">关闭</button>
-    </div>
-  </div>
-
-  <div id="modal-task-package" class="modal">
-    <div class="modal-content p-6 w-96">
-      <h3 class="text-xl font-bold mb-4">选择任务包</h3>
-      <div id="task-package-list" class="space-y-2 max-h-[60vh] overflow-auto"></div>
-      <button onclick="hideTaskPackageModal()" class="btn w-full mt-4 bg-gray-700 py-2 rounded-lg">关闭</button>
-    </div>
-  </div>
-
-  <div id="modal-error" class="modal">
-    <div class="modal-content p-6 w-80 text-center">
-      <h3 class="text-xl font-bold mb-4 text-red-500">出错了</h3>
-      <p id="error-message" class="text-gray-300 mb-4">错误信息</p>
-      <button onclick="hideErrorModal()" class="btn w-full bg-gray-700 py-2 rounded-lg">确定</button>
-    </div>
-  </div>
-
-  <div id="modal-game-menu" class="modal">
-    <div class="modal-content p-6 w-80">
-      <h3 class="text-xl font-bold mb-4 text-center">游戏菜单</h3>
-      <div class="space-y-2">
-        <button onclick="showRoomState()" class="btn w-full bg-gray-700 py-3 rounded-lg">📊 房间状态</button>
-        <button onclick="leaveRoom()" class="btn w-full bg-red-600 py-3 rounded-lg">🚪 退出房间</button>
-      </div>
-      <button onclick="hideGameMenu()" class="btn w-full mt-4 bg-gray-600 py-2 rounded-lg">关闭</button>
-    </div>
-  </div>
-
-  <div id="modal-import" class="modal">
-    <div class="modal-content p-6 w-96">
-      <h3 class="text-xl font-bold mb-4">导入任务包JSON</h3>
-      <textarea id="import-json" rows="10" placeholder="粘贴JSON内容..." class="font-mono text-sm"></textarea>
-      <div class="flex gap-2 mt-4">
-        <button onclick="doImportPackage()" class="btn flex-1 bg-blue-600 py-2 rounded-lg">导入</button>
-        <button onclick="hideImportModal()" class="btn bg-gray-700 py-2 px-4 rounded-lg">取消</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-challenge-target" class="modal">
-    <div class="modal-content p-6 w-96">
-      <h3 class="text-xl font-bold mb-4">选择挑战目标</h3>
-      <p class="text-sm text-gray-400 mb-4">选择一个玩家完成挑战任务</p>
-      <div id="challenge-target-list" class="space-y-2"></div>
-      <button onclick="hideChallengeTargetModal()" class="btn w-full mt-4 bg-gray-700 py-2 rounded-lg">取消</button>
-    </div>
+  <!-- 加载提示 -->
+  <div id="loading" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
   </div>
 
   <script src="js/utils.js"></script>
   <script src="js/socket.js"></script>
-  <script src="js/board.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/task.js"></script>
-  <script src="js/editor.js"></script>
-  <script src="js/app.js"></script>
+  <script>
+    // 页面状态
+    let socket = null;
+    let currentPlayerId = null;
+    let currentRoomCode = null;
+
+    function init() {
+      socket = io(window.location.origin, {
+        transports: ['websocket', 'polling'],
+        reconnection: true
+      });
+
+      socket.on('connect', () => {
+        console.log('已连接服务器');
+      });
+
+      socket.on('room_joined', (data) => {
+        hideLoading();
+        currentPlayerId = data.playerId;
+        currentRoomCode = data.roomCode;
+        // 跳转到等待室
+        window.location.href = `waiting.html?room=${data.roomCode}&player=${data.playerId}`;
+      });
+
+      socket.on('error', (data) => {
+        hideLoading();
+        showError(data.message || '操作失败');
+      });
+    }
+
+    function showLoading() {
+      document.getElementById('loading').classList.remove('hidden');
+    }
+
+    function hideLoading() {
+      document.getElementById('loading').classList.add('hidden');
+    }
+
+    function showError(msg) {
+      const toast = document.getElementById('error-toast');
+      document.getElementById('error-message').textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+
+    function getPlayerName() {
+      return document.getElementById('join-player-name').value.trim();
+    }
+
+    function joinByCode() {
+      const name = getPlayerName();
+      if (!name) { showError('请输入昵称'); return; }
+
+      const code = document.getElementById('join-room-code').value.trim().toUpperCase();
+      if (!code) { showError('请输入房间码'); return; }
+
+      const password = document.getElementById('join-room-password').value;
+      showLoading();
+      socket.emit('join_room', { roomCode: code, playerName: name, password: password || null });
+    }
+
+    function joinByShortCode() {
+      const name = getPlayerName();
+      if (!name) { showError('请输入昵称'); return; }
+
+      const shortCode = document.getElementById('join-short-code').value.trim().toUpperCase();
+      if (!shortCode) { showError('请输入短码'); return; }
+
+      const password = document.getElementById('join-room-password').value;
+      showLoading();
+      socket.emit('join_room_short', { shortCode, playerName: name, password: password || null });
+    }
+
+    // 昵称本地存储
+    const savedName = localStorage.getItem('playerName');
+    if (savedName) document.getElementById('join-player-name').value = savedName;
+
+    document.getElementById('join-player-name').addEventListener('change', (e) => {
+      localStorage.setItem('playerName', e.target.value);
+    });
+
+    init();
+  </script>
 </body>
 </html>

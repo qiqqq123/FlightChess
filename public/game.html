@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>游戏 - 飞行棋</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #16213e;
+      min-height: 100vh;
+    }
+    .btn { transition: all 0.2s; touch-action: manipulation; }
+    .btn:active { transform: scale(0.96); }
+    #gameCanvas { touch-action: none; }
+    .dice {
+      width: 60px;
+      height: 60px;
+      background: white;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: bold;
+      color: #1a1a2e;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dice:active { transform: scale(0.9); }
+    .dice.rolling { animation: dice-roll 0.3s infinite; }
+    @keyframes dice-roll { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(10deg); } 75% { transform: rotate(-10deg); } }
+    .task-option {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .task-option:hover { border-color: #533483; background: #0f3460; }
+    .task-option.selected { border-color: #E53935; background: #E53935; }
+  </style>
+</head>
+<body class="text-white">
+  <!-- 顶部栏 -->
+  <div class="p-2 flex justify-between items-center bg-gray-900/50">
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-gray-400">房间:</span>
+      <span class="font-bold text-sm" id="room-code">------</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-gray-400" id="timer">⏱ 45s</span>
+      <button onclick="toggleMenu()" class="btn bg-gray-700 py-1 px-3 rounded text-sm">☰</button>
+    </div>
+  </div>
+
+  <!-- 棋盘 -->
+  <div class="flex justify-center items-center p-2">
+    <canvas id="gameCanvas" class="max-w-full" style="max-height: 55vh"></canvas>
+  </div>
+
+  <!-- 控制面板 -->
+  <div class="bg-gray-900/80 p-4">
+    <!-- 回合提示 -->
+    <div id="turn-indicator" class="text-center mb-4">
+      <span class="text-sm text-gray-400">等待操作...</span>
+    </div>
+
+    <!-- 骰子 -->
+    <div class="flex justify-center items-center gap-4">
+      <div id="dice" class="dice" onclick="rollDice()">?</div>
+    </div>
+
+    <!-- 移动按钮 -->
+    <div id="action-buttons" class="flex justify-center gap-3 mt-4 hidden">
+      <button id="btn-forward" onclick="movePiece()" class="btn bg-green-600 hover:bg-green-700 py-3 px-8 rounded-xl text-lg font-semibold">
+        前进
+      </button>
+    </div>
+
+    <!-- 任务面板 -->
+    <div id="task-panel" class="hidden mt-4 bg-gray-800 rounded-xl p-4 border border-purple-600">
+      <div class="text-center mb-3">
+        <span class="text-purple-400 text-sm">⚡ 任务挑战</span>
+      </div>
+      <div id="task-content" class="text-center mb-4 text-lg"></div>
+      <div id="task-options" class="space-y-2"></div>
+      <div class="flex gap-2 mt-3">
+        <button id="btn-task-done" onclick="completeTask(true)" class="btn flex-1 bg-purple-600 py-2 rounded-lg hidden">
+          我已完成 ✓
+        </button>
+        <button onclick="skipTask()" class="btn bg-gray-700 py-2 px-4 rounded-lg text-sm">
+          跳过 (-1步)
+        </button>
+      </div>
+    </div>
+
+    <!-- 聊天 -->
+    <div class="flex gap-2 mt-4">
+      <input type="text" id="chat-input" placeholder="发送消息..." maxlength="50" class="flex-1" style="background:#16213e;border:2px solid #0f3460;border-radius:0.5rem;padding:0.5rem;color:white;" />
+      <button onclick="sendChat()" class="btn bg-blue-600 px-4 rounded-lg">发送</button>
+    </div>
+  </div>
+
+  <!-- 菜单弹窗 -->
+  <div id="menu-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-xs border border-gray-700">
+      <h3 class="text-xl font-bold mb-4 text-center">游戏菜单</h3>
+      <div class="space-y-2">
+        <button onclick="showRoomState()" class="btn w-full bg-gray-700 py-3 rounded-lg">📊 房间状态</button>
+        <button onclick="exitGame()" class="btn w-full bg-red-600 py-3 rounded-lg">🚪 退出房间</button>
+      </div>
+      <button onclick="toggleMenu()" class="btn w-full mt-4 bg-gray-600 py-2 rounded-lg">关闭</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg hidden z-50"></div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/board.js"></script>
+  <script>
+    // URL参数
+    const params = new URLSearchParams(window.location.search);
+    const roomCode = params.get('room');
+    const playerId = params.get('player');
+
+    if (!roomCode || !playerId) {
+      window.location.href = 'index.html';
+    }
+
+    // 游戏状态
+    let socket = null;
+    let gameState = null;
+    let turnTimer = null;
+    let turnTimeLeft = 45;
+
+    function init() {
+      socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
+
+      socket.on('connect', () => {
+        socket.emit('reconnect', { roomCode, playerId });
+      });
+
+      socket.on('reconnected', handleRoomUpdate);
+      socket.on('room_state', handleRoomUpdate);
+
+      socket.on('dice_result', (data) => {
+        updateDice(data.diceValue);
+        if (data.room) handleRoomUpdate(data);
+        showToast(data.moveHint || '');
+      });
+
+      socket.on('piece_moved', (data) => {
+        if (data.room) handleRoomUpdate(data);
+        renderBoard();
+        if (data.task) showTask(data.task);
+      });
+
+      socket.on('task_triggered', (data) => {
+        showTask(data.task);
+      });
+
+      socket.on('task_result', (data) => {
+        hideTask();
+        if (data.room) handleRoomUpdate(data);
+        renderBoard();
+        showToast(data.message || (data.taskSuccess ? '任务完成！' : '任务失败'));
+      });
+
+      socket.on('turn_change', (data) => {
+        if (data.room) handleRoomUpdate(data);
+        resetDice();
+        hideActionButtons();
+        if (data.timedOut) showToast('回合超时');
+      });
+
+      socket.on('game_over', (data) => {
+        const winner = data.room?.players?.find(p => p.id === data.winnerId);
+        alert(`🎉 游戏结束！\n\n${winner?.name || '玩家'} 获胜！`);
+        window.location.href = 'index.html';
+      });
+
+      socket.on('chat_message', (data) => {
+        console.log(`[${data.playerName}]: ${data.message}`);
+      });
+
+      socket.on('error', (data) => {
+        showToast(data.message || '操作失败');
+      });
+
+      // 初始化棋盘
+      initBoard();
+    }
+
+    function handleRoomUpdate(data) {
+      gameState = data.room;
+      if (!gameState) return;
+
+      document.getElementById('room-code').textContent = gameState.code;
+
+      // 更新回合指示器
+      const currentPlayer = gameState.players[gameState.currentTurnIndex];
+      const isMyTurn = currentPlayer?.id === playerId;
+
+      const indicator = document.getElementById('turn-indicator');
+      if (isMyTurn) {
+        indicator.innerHTML = `
+          <div class="text-green-400 text-sm">你的回合</div>
+          <div class="text-lg font-bold" style="color:${getColorCSS(currentPlayer.color)}">${currentPlayer.name}</div>
+        `;
+        // 自己的回合时启用骰子
+        if (!gameState.diceRolled && !gameState.taskPending) {
+          document.getElementById('dice').style.opacity = '1';
+          document.getElementById('dice').style.pointerEvents = 'auto';
+        }
+      } else {
+        indicator.innerHTML = `
+          <div class="text-gray-400 text-sm">等待 ${currentPlayer?.name || '玩家'} 操作...</div>
+          <div class="text-lg font-bold" style="color:${getColorCSS(currentPlayer?.color)}">${getColorName(currentPlayer?.color)}方</div>
+        `;
+        document.getElementById('dice').style.opacity = '0.5';
+        document.getElementById('dice').style.pointerEvents = 'none';
+      }
+
+      // 更新回合计时器
+      turnTimeLeft = gameState.turnDuration || 45;
+      updateTimer();
+
+      renderBoard();
+    }
+
+    function updateTimer() {
+      const el = document.getElementById('timer');
+      if (turnTimeLeft <= 5) {
+        el.innerHTML = `<span class="text-red-400">⏱ ${turnTimeLeft}s</span>`;
+      } else {
+        el.innerHTML = `<span class="text-gray-400">⏱ ${turnTimeLeft}s</span>`;
+      }
+    }
+
+    function updateDice(value) {
+      const dice = document.getElementById('dice');
+      dice.textContent = value;
+      dice.classList.add('rolling');
+      setTimeout(() => dice.classList.remove('rolling'), 500);
+
+      // 骰完后检查是否需要显示移动按钮
+      const currentPlayer = gameState?.players[gameState?.currentTurnIndex];
+      if (currentPlayer?.id === playerId) {
+        const pos = currentPlayer.piece;
+        if (value === 6 && pos === -1) {
+          showActionButtons(true); // 显示出发
+        } else if (value !== 6 && pos === -1) {
+          hideActionButtons();
+        } else if (value > 0) {
+          showActionButtons(false); // 显示前进
+        }
+      }
+    }
+
+    function resetDice() {
+      const dice = document.getElementById('dice');
+      dice.textContent = '?';
+      dice.classList.remove('rolling');
+    }
+
+    function showActionButtons(isLeaveBase) {
+      const div = document.getElementById('action-buttons');
+      const btn = document.getElementById('btn-forward');
+      btn.textContent = isLeaveBase ? '出发 ✈' : '前进 →';
+      div.classList.remove('hidden');
+    }
+
+    function hideActionButtons() {
+      document.getElementById('action-buttons').classList.add('hidden');
+    }
+
+    function showTask(task) {
+      const panel = document.getElementById('task-panel');
+      const content = document.getElementById('task-content');
+      const options = document.getElementById('task-options');
+      const doneBtn = document.getElementById('btn-task-done');
+
+      panel.classList.remove('hidden');
+      content.textContent = task.content || '';
+
+      if (task.type === 'question' && task.options) {
+        options.innerHTML = task.options.map((opt, i) => `
+          <button class="task-option w-full text-left" onclick="answerTask(${i})">
+            ${String.fromCharCode(65 + i)}. ${opt}
+          </button>
+        `).join('');
+        doneBtn.classList.add('hidden');
+      } else {
+        options.innerHTML = `<div class="text-gray-400 text-center">${task.description || '请完成动作后点击确认'}</div>`;
+        doneBtn.classList.remove('hidden');
+      }
+
+      hideActionButtons();
+    }
+
+    function hideTask() {
+      document.getElementById('task-panel').classList.add('hidden');
+    }
+
+    function rollDice() {
+      if (!gameState) return;
+      const current = gameState.players[gameState.currentTurnIndex];
+      if (!current || current.id !== playerId) return;
+      if (gameState.diceRolled) return;
+      if (gameState.taskPending) return;
+      socket.emit('roll_dice');
+    }
+
+    function movePiece() {
+      if (!gameState || !gameState.diceRolled || gameState.taskPending) return;
+      const current = gameState.players[gameState.currentTurnIndex];
+      if (!current || current.id !== playerId) return;
+      hideActionButtons();
+      socket.emit('move_piece', { pieceIndex: 0 });
+    }
+
+    function answerTask(index) {
+      document.querySelectorAll('.task-option').forEach((btn, i) => {
+        btn.classList.toggle('selected', i === index);
+      });
+      setTimeout(() => {
+        socket.emit('task_answer', { answer: index });
+      }, 300);
+    }
+
+    function completeTask() {
+      socket.emit('task_action');
+    }
+
+    function skipTask() {
+      socket.emit('skip_task');
+    }
+
+    function sendChat() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+      socket.emit('chat_message', { message: msg });
+      input.value = '';
+    }
+
+    function toggleMenu() {
+      document.getElementById('menu-modal').classList.toggle('hidden');
+    }
+
+    function showRoomState() {
+      toggleMenu();
+      alert(`房间: ${gameState?.code}\n人数: ${gameState?.players?.length}/${gameState?.maxPlayers}\n难度: ${getDifficultyLabel(gameState?.difficulty)}`);
+    }
+
+    function exitGame() {
+      socket.emit('leave_room');
+      window.location.href = 'index.html';
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2000);
+    }
+
+    function getColorCSS(color) {
+      const map = { red: '#E53935', blue: '#1E88E5', yellow: '#FDD835', green: '#43A047', purple: '#8E24AA', orange: '#FB8C00' };
+      return map[color] || '#888';
+    }
+
+    function getColorName(color) {
+      const map = { red: '红色', blue: '蓝色', yellow: '黄色', green: '绿色', purple: '紫色', orange: '橙色' };
+      return map[color] || color;
+    }
+
+    function getDifficultyLabel(diff) {
+      const map = { easy: '休闲', normal: '团建', hard: '竞技' };
+      return map[diff] || '普通';
+    }
+
+    // 聊天回车发送
+    document.getElementById('chat-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendChat();
+    });
+
+    init();
+  </script>
+</body>
+</html>

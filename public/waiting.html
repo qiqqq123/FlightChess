@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>等待室 - 飞行棋</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+    }
+    .btn { transition: all 0.2s; touch-action: manipulation; }
+    .btn:active { transform: scale(0.96); }
+    select {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+      color: white;
+      width: 100%;
+    }
+    select:focus { outline: none; border-color: #533483; }
+  </style>
+</head>
+<body class="text-white">
+  <div class="min-h-screen p-4">
+    <div class="max-w-2xl mx-auto">
+      <!-- 返回按钮 -->
+      <a href="index.html" class="btn text-gray-400 hover:text-white mb-4 flex items-center gap-2 text-sm">
+        <span>←</span> 退出房间
+      </a>
+
+      <!-- 房间信息 -->
+      <div class="text-center mb-6">
+        <h2 class="text-2xl font-bold mb-2">等待房间</h2>
+        <div class="bg-gray-800 rounded-xl p-4 inline-block">
+          <div class="text-sm text-gray-400 mb-1">房间码</div>
+          <div class="text-3xl font-bold tracking-widest" id="room-code">------</div>
+          <div class="text-sm text-gray-400 mt-3 mb-1">短码（分享用）</div>
+          <div class="text-xl font-semibold text-yellow-400" id="short-code">----</div>
+        </div>
+      </div>
+
+      <!-- 快速操作 -->
+      <div class="text-center mb-4 flex justify-center gap-2">
+        <button onclick="copyRoomCode()" class="btn bg-gray-700 hover:bg-gray-600 py-2 px-4 rounded-lg text-sm">
+          📋 复制房间码
+        </button>
+        <button onclick="copyShortCode()" class="btn bg-gray-700 hover:bg-gray-600 py-2 px-4 rounded-lg text-sm">
+          🔗 复制短码
+        </button>
+      </div>
+
+      <!-- 房间设置信息 -->
+      <div class="bg-gray-800/50 rounded-2xl p-4 border border-gray-700 mb-4 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+          <div>
+            <div class="text-gray-400">难度</div>
+            <div class="font-semibold" id="difficulty">普通</div>
+          </div>
+          <div>
+            <div class="text-gray-400">回合时长</div>
+            <div class="font-semibold" id="turn-duration">45秒</div>
+          </div>
+          <div>
+            <div class="text-gray-400">最大人数</div>
+            <div class="font-semibold" id="max-players">4人</div>
+          </div>
+          <div>
+            <div class="text-gray-400">密码</div>
+            <div class="font-semibold" id="has-password">无</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 玩家列表 -->
+      <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700 mb-4">
+        <h3 class="text-lg font-semibold mb-4">
+          玩家列表 (<span id="player-count">0</span>/<span id="max-players-display">4</span>)
+        </h3>
+        <div id="player-list" class="space-y-3"></div>
+      </div>
+
+      <!-- 房主控制面板 -->
+      <div id="owner-panel" class="bg-gray-800/50 rounded-2xl p-4 border border-gray-700 mb-4 hidden">
+        <h3 class="text-lg font-semibold mb-3">🏠 房主设置</h3>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">难度</label>
+            <select id="set-difficulty" onchange="changeDifficulty()">
+              <option value="easy">休闲</option>
+              <option value="normal">团建</option>
+              <option value="hard">竞技</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">回合时长</label>
+            <select id="set-turn-duration" onchange="changeTurnDuration()">
+              <option value="15">15秒</option>
+              <option value="30">30秒</option>
+              <option value="45">45秒</option>
+              <option value="60">60秒</option>
+              <option value="90">90秒</option>
+              <option value="120">120秒</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">最大人数</label>
+            <select id="set-max-players" onchange="changeMaxPlayers()">
+              <option value="2">2人</option>
+              <option value="3">3人</option>
+              <option value="4">4人</option>
+              <option value="5">5人</option>
+              <option value="6">6人</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="resetPassword()" class="btn w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded-lg text-sm">
+          🔐 重置房间密码
+        </button>
+      </div>
+
+      <!-- 非房主提示 -->
+      <div id="player-tip" class="text-center text-gray-400 text-sm mb-4 hidden">
+        等待房主开始游戏...
+      </div>
+
+      <!-- 开始游戏按钮 -->
+      <button id="start-game-btn" onclick="startGame()" class="btn w-full bg-green-600 hover:bg-green-700 py-4 rounded-xl text-xl font-bold mb-4 hidden">
+        🎮 开始游戏
+      </button>
+
+      <!-- 任务包选择 -->
+      <button onclick="showTaskPackages()" class="btn w-full bg-purple-600 hover:bg-purple-700 py-3 rounded-xl hidden">
+        📦 选择任务包
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg hidden z-50">
+  </div>
+
+  <!-- 任务包选择弹窗 -->
+  <div id="task-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-gray-800 rounded-2xl p-6 w-full max-w-md border border-gray-700">
+      <h3 class="text-xl font-bold mb-4">选择任务包</h3>
+      <div id="task-package-list" class="space-y-2 max-h-[50vh] overflow-auto mb-4"></div>
+      <button onclick="closeTaskModal()" class="btn w-full bg-gray-700 py-2 rounded-lg">关闭</button>
+    </div>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script>
+    // URL参数
+    const params = new URLSearchParams(window.location.search);
+    const roomCode = params.get('room');
+    const playerId = params.get('player');
+
+    if (!roomCode || !playerId) {
+      window.location.href = 'index.html';
+    }
+
+    // 页面状态
+    let socket = null;
+    let isOwner = false;
+    let roomData = null;
+
+    function init() {
+      socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
+
+      socket.on('connect', () => {
+        // 重新加入房间
+        socket.emit('reconnect', { roomCode, playerId });
+      });
+
+      socket.on('reconnected', handleRoomUpdate);
+      socket.on('room_state', handleRoomUpdate);
+      socket.on('player_joined', handleRoomUpdate);
+      socket.on('player_left', handleRoomUpdate);
+      socket.on('player_disconnected', handleRoomUpdate);
+      socket.on('player_reconnected', handleRoomUpdate);
+      socket.on('color_changed', handleRoomUpdate);
+      socket.on('difficulty_changed', handleRoomUpdate);
+      socket.on('turn_duration_changed', handleRoomUpdate);
+      socket.on('max_players_changed', handleRoomUpdate);
+      socket.on('password_changed', handleRoomUpdate);
+      socket.on('task_package_changed', handleRoomUpdate);
+
+      socket.on('game_start', (data) => {
+        // 跳转到游戏页面
+        window.location.href = `game.html?room=${roomCode}&player=${playerId}`;
+      });
+
+      socket.on('error', (data) => {
+        showToast(data.message || '操作失败');
+      });
+    }
+
+    function handleRoomUpdate(data) {
+      roomData = data.room;
+      if (!roomData) return;
+
+      // 更新房间信息
+      document.getElementById('room-code').textContent = roomData.code;
+      document.getElementById('short-code').textContent = roomData.shortCode || '----';
+      document.getElementById('max-players').textContent = `${roomData.maxPlayers}人`;
+      document.getElementById('max-players-display').textContent = roomData.maxPlayers;
+      document.getElementById('turn-duration').textContent = `${roomData.turnDuration || 45}秒`;
+      document.getElementById('difficulty').textContent = getDifficultyLabel(roomData.difficulty);
+      document.getElementById('has-password').textContent = roomData.password ? '有' : '无';
+
+      // 判断是否是房主
+      isOwner = roomData.players[0] && roomData.players[0].id === playerId;
+
+      // 更新房主面板
+      document.getElementById('owner-panel').classList.toggle('hidden', !isOwner);
+      document.getElementById('player-tip').classList.toggle('hidden', isOwner);
+
+      // 开始游戏按钮（房主且至少2人）
+      const startBtn = document.getElementById('start-game-btn');
+      startBtn.classList.toggle('hidden', !isOwner || roomData.players.length < 2);
+
+      // 同步下拉框
+      if (isOwner) {
+        document.getElementById('set-difficulty').value = roomData.difficulty || 'normal';
+        document.getElementById('set-turn-duration').value = String(roomData.turnDuration || 45);
+        document.getElementById('set-max-players').value = String(roomData.maxPlayers || 4);
+      }
+
+      // 更新玩家列表
+      document.getElementById('player-count').textContent = roomData.players.length;
+      const list = document.getElementById('player-list');
+      list.innerHTML = roomData.players.map(p => `
+        <div class="flex items-center gap-3 p-3 rounded-lg bg-gray-900/50 ${!p.isOnline ? 'opacity-50' : ''}">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg"
+               style="background: ${getColorCSS(p.color)}">
+            ${p.name[0]}
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold">${p.name}</div>
+            <div class="text-xs text-gray-400">${getColorName(p.color)}</div>
+          </div>
+          <div class="text-right">
+            ${p.isOnline ? '<span class="text-green-400 text-xs">在线</span>' : '<span class="text-red-400 text-xs">离线</span>'}
+            ${p.id === playerId ? '<span class="text-blue-400 text-xs block">(你)</span>' : ''}
+            ${p.isOwner ? '<span class="text-yellow-400 text-xs block">房主</span>' : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function getColorCSS(color) {
+      const map = { red: '#E53935', blue: '#1E88E5', yellow: '#FDD835', green: '#43A047', purple: '#8E24AA', orange: '#FB8C00' };
+      return map[color] || '#888';
+    }
+
+    function getColorName(color) {
+      const map = { red: '红色', blue: '蓝色', yellow: '黄色', green: '绿色', purple: '紫色', orange: '橙色' };
+      return map[color] || color;
+    }
+
+    function getDifficultyLabel(diff) {
+      const map = { easy: '休闲', normal: '团建', hard: '竞技' };
+      return map[diff] || '普通';
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2000);
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => showToast('已复制'));
+    }
+
+    function copyRoomCode() {
+      copyToClipboard(roomData?.code || '');
+    }
+
+    function copyShortCode() {
+      copyToClipboard(roomData?.shortCode || '');
+    }
+
+    function changeDifficulty() {
+      const val = document.getElementById('set-difficulty').value;
+      socket.emit('set_difficulty', { difficulty: val });
+    }
+
+    function changeTurnDuration() {
+      const val = parseInt(document.getElementById('set-turn-duration').value);
+      socket.emit('set_turn_duration', { seconds: val });
+    }
+
+    function changeMaxPlayers() {
+      const val = parseInt(document.getElementById('set-max-players').value);
+      socket.emit('set_max_players', { maxPlayers: val });
+    }
+
+    function resetPassword() {
+      const newPwd = prompt('输入新密码（6-10位字母+数字），留空清除密码：');
+      if (newPwd === null) return;
+      if (newPwd && (newPwd.length < 6 || newPwd.length > 10 || !/[a-zA-Z]/.test(newPwd) || !/[0-9]/.test(newPwd))) {
+        showToast('密码格式不正确');
+        return;
+      }
+      socket.emit('reset_password', { newPassword: newPwd || null });
+    }
+
+    function startGame() {
+      socket.emit('start_game');
+    }
+
+    function showTaskPackages() {
+      fetch('/api/task-packages')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            const list = document.getElementById('task-package-list');
+            list.innerHTML = data.packages.map(pkg => `
+              <div class="task-list-item p-3 rounded-lg bg-gray-900 cursor-pointer hover:bg-gray-700"
+                   onclick="selectTaskPackage('${pkg.id}')">
+                <div class="font-semibold">${pkg.name}</div>
+                <div class="text-xs text-gray-400">${pkg.taskCount || pkg.tasks?.length || 0} 个任务</div>
+              </div>
+            `).join('');
+            document.getElementById('task-modal').classList.remove('hidden');
+          }
+        });
+    }
+
+    function selectTaskPackage(id) {
+      socket.emit('set_task_package', { taskPackageId: id });
+      closeTaskModal();
+    }
+
+    function closeTaskModal() {
+      document.getElementById('task-modal').classList.add('hidden');
+    }
+
+    init();
+  </script>
+</body>
+</html>
