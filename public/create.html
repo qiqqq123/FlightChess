@@ -6,64 +6,263 @@
   <title>创建房间 - 飞行棋</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
       padding: 0;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
       min-height: 100vh;
+      overflow-x: hidden;
     }
-    .btn { transition: all 0.2s; touch-action: manipulation; }
+    .bg-particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      animation: float 15s infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .btn {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      touch-action: manipulation;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+    .btn:hover::before {
+      left: 100%;
+    }
     .btn:active { transform: scale(0.96); }
-    input, select {
-      background: #16213e;
-      border: 2px solid #0f3460;
-      border-radius: 0.5rem;
-      padding: 0.75rem;
+    .input-field {
+      background: rgba(15, 12, 41, 0.8);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 14px 16px;
       color: white;
       width: 100%;
       font-size: 1rem;
+      transition: all 0.3s ease;
     }
-    input:focus, select:focus { outline: none; border-color: #533483; }
+    .input-field:focus {
+      outline: none;
+      border-color: #a855f7;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+      background: rgba(15, 12, 41, 0.95);
+    }
+    .input-field::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+    select.input-field {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 20px;
+      padding-right: 40px;
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .stagger-1 { animation-delay: 0.1s; opacity: 0; }
+    .stagger-2 { animation-delay: 0.2s; opacity: 0; }
+    .stagger-3 { animation-delay: 0.3s; opacity: 0; }
+    /* 自定义单选框 */
+    .radio-custom {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      background: rgba(15, 12, 41, 0.6);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .radio-custom:hover {
+      border-color: rgba(168, 85, 247, 0.5);
+      background: rgba(15, 12, 41, 0.8);
+    }
+    .radio-custom input:checked + span {
+      color: #a855f7;
+    }
+    .radio-custom input:checked ~ .radio-check {
+      background: #a855f7;
+      border-color: #a855f7;
+    }
+    .radio-custom input:checked ~ .radio-check::after {
+      transform: scale(1);
+    }
+    .radio-check {
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    .radio-check::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      width: 10px;
+      height: 10px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(168, 85, 247, 0.3);
+      border-top-color: #a855f7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .toast {
+      animation: toast-in 0.3s ease, toast-out 0.3s ease 2.7s forwards;
+    }
+    @keyframes toast-in {
+      from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    @keyframes toast-out {
+      from { transform: translateX(-50%) translateY(0); opacity: 1; }
+      to { transform: translateX(-50%) translateY(100%); opacity: 0; }
+    }
+    /* 难度选择卡片 */
+    .difficulty-option {
+      padding: 16px;
+      background: rgba(15, 12, 41, 0.6);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+    .difficulty-option:hover {
+      transform: translateY(-2px);
+      border-color: rgba(168, 85, 247, 0.5);
+    }
+    .difficulty-option.selected {
+      border-color: #a855f7;
+      background: rgba(168, 85, 247, 0.2);
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.5); border-radius: 3px; }
   </style>
 </head>
 <body class="text-white">
-  <div class="min-h-screen p-4">
+  <div class="bg-particles" id="particles"></div>
+
+  <div class="min-h-screen p-4 relative z-10">
     <div class="max-w-md mx-auto">
-      <a href="index.html" class="btn text-gray-400 hover:text-white mb-4 flex items-center gap-2">
-        <span>←</span> 返回首页
+      <!-- 返回按钮 -->
+      <a href="index.html" class="btn inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-all fade-in">
+        <span class="text-xl">←</span>
+        <span>返回首页</span>
       </a>
 
-      <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
-        <h2 class="text-2xl font-semibold mb-2 text-center" id="mode-title">创建房间</h2>
-        <p class="text-gray-400 text-center text-sm mb-6" id="mode-desc">设置房间参数</p>
+      <div class="glass-card rounded-3xl p-6 fade-in stagger-1">
+        <div class="text-center mb-6">
+          <span class="text-5xl block mb-3" id="mode-icon">👥</span>
+          <h2 class="text-3xl font-black mb-2" id="mode-title">创建多人房间</h2>
+          <p class="text-gray-400" id="mode-desc">2-6人，欢乐对战</p>
+        </div>
 
-        <div class="space-y-4">
+        <div class="space-y-5">
+          <!-- 昵称 -->
           <div>
-            <label class="block text-gray-400 mb-2 text-sm">你的昵称</label>
-            <input type="text" id="player-name" placeholder="输入昵称" maxlength="20" />
+            <label class="block text-gray-300 mb-2 font-medium flex items-center gap-2">
+              <span>👤</span> 你的昵称
+            </label>
+            <input type="text" id="player-name" placeholder="输入昵称" maxlength="20" class="input-field" />
           </div>
 
+          <!-- 密码 -->
           <div>
-            <label class="block text-gray-400 mb-2 text-sm">房间密码 (6-10位字母+数字)</label>
-            <input type="password" id="room-password" placeholder="自定义密码 (可选)" maxlength="20" />
-            <p class="text-xs text-gray-500 mt-1">密码为空则不设置密码</p>
+            <label class="block text-gray-300 mb-2 font-medium flex items-center gap-2">
+              <span>🔐</span> 房间密码
+              <span class="text-xs text-gray-500">(可选)</span>
+            </label>
+            <input type="password" id="room-password" placeholder="6-10位字母+数字" maxlength="20" class="input-field" />
+            <p class="text-xs text-gray-500 mt-1.5">密码为空则不设置密码</p>
           </div>
 
+          <!-- 难度 -->
           <div>
-            <label class="block text-gray-400 mb-2 text-sm">游戏难度</label>
-            <select id="difficulty-select">
-              <option value="easy">🟢 休闲模式（任务简单，朋友聚会）</option>
-              <option value="normal" selected>🟡 团建模式（均衡难度，团队竞技）</option>
-              <option value="hard">🔴 竞技模式（高难度挑战，对抗竞技）</option>
-            </select>
+            <label class="block text-gray-300 mb-3 font-medium flex items-center gap-2">
+              <span>🎯</span> 游戏难度
+            </label>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="difficulty-option" data-value="easy" onclick="selectDifficulty('easy')">
+                <div class="text-2xl mb-1">🟢</div>
+                <div class="font-semibold">休闲</div>
+                <div class="text-xs text-gray-400 mt-1">简单任务</div>
+              </div>
+              <div class="difficulty-option selected" data-value="normal" onclick="selectDifficulty('normal')">
+                <div class="text-2xl mb-1">🟡</div>
+                <div class="font-semibold">团建</div>
+                <div class="text-xs text-gray-400 mt-1">均衡难度</div>
+              </div>
+              <div class="difficulty-option" data-value="hard" onclick="selectDifficulty('hard')">
+                <div class="text-2xl mb-1">🔴</div>
+                <div class="font-semibold">竞技</div>
+                <div class="text-xs text-gray-400 mt-1">高难度</div>
+              </div>
+            </div>
           </div>
 
+          <!-- 回合时长 -->
           <div>
-            <label class="block text-gray-400 mb-2 text-sm">回合时长</label>
-            <select id="turn-duration-select">
+            <label class="block text-gray-300 mb-2 font-medium flex items-center gap-2">
+              <span>⏱</span> 回合时长
+            </label>
+            <select id="turn-duration-select" class="input-field">
               <option value="15">15秒（快节奏）</option>
               <option value="30">30秒</option>
               <option value="45" selected>45秒（默认）</option>
@@ -73,9 +272,12 @@
             </select>
           </div>
 
+          <!-- 最大人数 -->
           <div>
-            <label class="block text-gray-400 mb-2 text-sm">最大人数</label>
-            <select id="max-players-select">
+            <label class="block text-gray-300 mb-2 font-medium flex items-center gap-2">
+              <span>👥</span> 最大人数
+            </label>
+            <select id="max-players-select" class="input-field">
               <option value="2">2人</option>
               <option value="3">3人</option>
               <option value="4" selected>4人（推荐）</option>
@@ -84,25 +286,28 @@
             </select>
           </div>
 
+          <!-- 房间可见性 -->
           <div>
-            <label class="block text-gray-400 mb-2 text-sm">房间可见性</label>
-            <div class="flex gap-4 mt-2">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="is-public" value="true" checked class="w-5 h-5 accent-purple-500" />
-                <span>🌐 公开房间</span>
-                <span class="text-xs text-gray-500">(显示在房间列表)</span>
+            <label class="block text-gray-300 mb-3 font-medium flex items-center gap-2">
+              <span>🌐</span> 房间可见性
+            </label>
+            <div class="space-y-3">
+              <label class="radio-custom">
+                <input type="radio" name="is-public" value="true" checked class="hidden" />
+                <span class="text-lg">🌐</span>
+                <span class="flex-1">公开房间</span>
+                <span class="radio-check"></span>
               </label>
-            </div>
-            <div class="flex gap-4 mt-2">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="is-public" value="false" class="w-5 h-5 accent-purple-500" />
-                <span>🔒 私密房间</span>
-                <span class="text-xs text-gray-500">(不在列表显示)</span>
+              <label class="radio-custom">
+                <input type="radio" name="is-public" value="false" class="hidden" />
+                <span class="text-lg">🔒</span>
+                <span class="flex-1">私密房间</span>
+                <span class="radio-check"></span>
               </label>
             </div>
           </div>
 
-          <button onclick="createRoom()" class="btn w-full bg-green-600 hover:bg-green-700 py-4 rounded-xl text-lg font-semibold mt-4">
+          <button onclick="createRoom()" class="btn w-full py-4 rounded-2xl text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 shadow-lg hover:shadow-green-500/30 mt-4">
             🎮 创建房间
           </button>
         </div>
@@ -110,38 +315,64 @@
     </div>
   </div>
 
-  <!-- 错误提示 -->
-  <div id="error-toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg hidden z-50">
-    <span id="error-message"></span>
+  <!-- Toast -->
+  <div id="error-toast" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 hidden z-50">
+    <div class="toast bg-gradient-to-r from-red-600 to-rose-600 text-white px-6 py-3 rounded-full shadow-2xl font-semibold">
+      <span id="error-message"></span>
+    </div>
   </div>
 
-  <!-- 加载提示 -->
-  <div id="loading" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
-    <div class="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+  <!-- Loading -->
+  <div id="loading" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+    <div class="text-center">
+      <div class="loading-spinner mx-auto mb-4"></div>
+      <div class="text-lg font-semibold text-purple-300">创建房间中...</div>
+    </div>
   </div>
 
   <script src="js/utils.js"></script>
   <script>
+    // 生成背景粒子
+    function createParticles() {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 15; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 15 + 's';
+        particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+        container.appendChild(particle);
+      }
+    }
+    createParticles();
+
     // 获取URL参数
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode') || 'multi';
 
     // 设置页面标题
     if (mode === 'couple') {
-      document.getElementById('mode-title').textContent = '💑 创建情侣房间';
+      document.getElementById('mode-icon').textContent = '💑';
+      document.getElementById('mode-title').textContent = '创建情侣房间';
       document.getElementById('mode-desc').textContent = '仅限2人，开启私密对战';
-      // 情侣模式强制2人
       const maxSel = document.getElementById('max-players-select');
       maxSel.innerHTML = '<option value="2" selected>2人</option>';
       maxSel.disabled = true;
     } else {
-      document.getElementById('mode-title').textContent = '👥 创建多人房间';
+      document.getElementById('mode-icon').textContent = '👥';
+      document.getElementById('mode-title').textContent = '创建多人房间';
       document.getElementById('mode-desc').textContent = '2-6人，欢乐对战';
     }
 
-    // Socket连接
+    let selectedDifficulty = 'normal';
     let socket = null;
-    let selectedColor = 'red';
+
+    function selectDifficulty(diff) {
+      selectedDifficulty = diff;
+      document.querySelectorAll('.difficulty-option').forEach(el => {
+        el.classList.toggle('selected', el.dataset.value === diff);
+      });
+    }
 
     function init() {
       socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
@@ -152,7 +383,6 @@
 
       socket.on('room_created', (data) => {
         hideLoading();
-        // 跳转到等待室
         window.location.href = `waiting.html?room=${data.roomCode}&player=${data.playerId}`;
       });
 
@@ -200,17 +430,15 @@
       const pwdCheck = validatePassword(password);
       if (!pwdCheck.valid) { showError(pwdCheck.error); return; }
 
-      const difficulty = document.getElementById('difficulty-select').value;
+      const difficulty = selectedDifficulty;
       const turnDuration = parseInt(document.getElementById('turn-duration-select').value);
       let maxPlayers = parseInt(document.getElementById('max-players-select').value);
       const isPublic = document.querySelector('input[name="is-public"]:checked').value === 'true';
 
-      // 情侣模式强制2人
       if (mode === 'couple') maxPlayers = 2;
 
       showLoading();
 
-      // 发送到服务器
       socket.emit('create_room', {
         mode: mode,
         playerName: playerName,
@@ -219,7 +447,7 @@
           maxPlayers: maxPlayers,
           turnDuration: turnDuration,
           difficulty: difficulty,
-          pieceColor: selectedColor,
+          pieceColor: 'red',
           isPublic: isPublic
         }
       });
