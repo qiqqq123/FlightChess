@@ -36,23 +36,22 @@ io.on('connection', (socket) => {
   // 心跳检测
   socket.emit('pong');
 
-  // 创建房间
+  // 创建房间 (支持选项: maxPlayers, turnDuration, difficulty)
   socket.on('create_room', (data) => {
-    const { mode, playerName, password } = data;
+    const { mode, playerName, password, options } = data;
 
     if (!['couple', 'multi'].includes(mode)) {
       socket.emit('error', { code: 'INVALID_MODE', message: '无效的房间模式' });
       return;
     }
 
-    // 过滤敏感词
     const filteredName = filterSensitiveWords(playerName);
     if (!filteredName || filteredName.trim().length === 0) {
       socket.emit('error', { code: 'INVALID_NAME', message: '请输入有效的昵称' });
       return;
     }
 
-    const result = roomModule.createRoom(mode, filteredName, password);
+    const result = roomModule.createRoom(mode, filteredName, password, options || {});
 
     if (!result.success) {
       socket.emit('error', { code: 'CREATE_FAILED', message: result.error });
@@ -70,7 +69,7 @@ io.on('connection', (socket) => {
       room: gameModule.getGameState(result.room)
     });
 
-    console.log(`房间创建: ${result.room.code}, 玩家: ${filteredName}`);
+    console.log(`房间创建: ${result.room.code}, 玩家: ${filteredName}, 难度: ${result.room.difficulty}`);
   });
 
   // 加入房间
@@ -100,7 +99,6 @@ io.on('connection', (socket) => {
       room: gameModule.getGameState(result.room)
     });
 
-    // 通知房间内其他玩家
     socket.to(currentRoomCode).emit('player_joined', {
       player: result.player,
       room: gameModule.getGameState(result.room)
@@ -142,6 +140,107 @@ io.on('connection', (socket) => {
     });
   });
 
+  // 房主重置密码
+  socket.on('reset_password', (data) => {
+    if (!currentRoomCode) {
+      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
+      return;
+    }
+    const { newPassword } = data;
+    const result = roomModule.resetPassword(currentPlayerId, currentRoomCode, newPassword);
+
+    if (!result.success) {
+      socket.emit('error', { code: 'PASSWORD_RESET_FAILED', message: result.error });
+      return;
+    }
+
+    io.to(currentRoomCode).emit('password_changed', {
+      hasPassword: !!newPassword,
+      room: gameModule.getGameState(result.room)
+    });
+  });
+
+  // 玩家选择棋子颜色
+  socket.on('choose_color', (data) => {
+    if (!currentRoomCode) {
+      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
+      return;
+    }
+    const { color } = data;
+    const result = roomModule.choosePlayerColor(currentPlayerId, currentRoomCode, color);
+
+    if (!result.success) {
+      socket.emit('error', { code: 'COLOR_CHANGE_FAILED', message: result.error });
+      return;
+    }
+
+    io.to(currentRoomCode).emit('color_changed', {
+      playerId: currentPlayerId,
+      color: color,
+      room: gameModule.getGameState(result.room)
+    });
+  });
+
+  // 设置难度 (仅房主, 游戏未开始)
+  socket.on('set_difficulty', (data) => {
+    if (!currentRoomCode) {
+      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
+      return;
+    }
+    const { difficulty } = data;
+    const result = roomModule.setDifficulty(currentPlayerId, currentRoomCode, difficulty);
+
+    if (!result.success) {
+      socket.emit('error', { code: 'SET_DIFFICULTY_FAILED', message: result.error });
+      return;
+    }
+
+    io.to(currentRoomCode).emit('difficulty_changed', {
+      difficulty: difficulty,
+      room: gameModule.getGameState(result.room)
+    });
+  });
+
+  // 设置最大玩家数 (仅房主, 游戏未开始)
+  socket.on('set_max_players', (data) => {
+    if (!currentRoomCode) {
+      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
+      return;
+    }
+    const { maxPlayers } = data;
+    const result = roomModule.setMaxPlayers(currentPlayerId, currentRoomCode, maxPlayers);
+
+    if (!result.success) {
+      socket.emit('error', { code: 'SET_MAX_PLAYERS_FAILED', message: result.error });
+      return;
+    }
+
+    io.to(currentRoomCode).emit('max_players_changed', {
+      maxPlayers: maxPlayers,
+      room: gameModule.getGameState(result.room)
+    });
+  });
+
+  // 设置回合时长 (仅房主, 游戏未开始)
+  socket.on('set_turn_duration', (data) => {
+    if (!currentRoomCode) {
+      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
+      return;
+    }
+    const { seconds } = data;
+    const result = roomModule.setTurnDuration(currentPlayerId, currentRoomCode, seconds);
+
+    if (!result.success) {
+      socket.emit('error', { code: 'SET_TURN_DURATION_FAILED', message: result.error });
+      return;
+    }
+
+    io.to(currentRoomCode).emit('turn_duration_changed', {
+      turnDuration: seconds,
+      room: gameModule.getGameState(result.room)
+    });
+  });
+
   // 离开房间
   socket.on('leave_room', () => {
     if (!currentRoomCode) return;
@@ -160,7 +259,7 @@ io.on('connection', (socket) => {
     currentRoomCode = null;
   });
 
-  // 断线重连
+  // 断线重连 - 保留原有棋子和游戏状态
   socket.on('reconnect', (data) => {
     const { playerId, roomCode } = data;
 
@@ -188,10 +287,7 @@ io.on('connection', (socket) => {
 
   // 设置任务包
   socket.on('set_task_package', (data) => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
-      return;
-    }
+    if (!currentRoomCode) return;
 
     const { taskPackageId } = data;
     const result = roomModule.setTaskPackage(currentRoomCode, taskPackageId);
@@ -209,10 +305,7 @@ io.on('connection', (socket) => {
 
   // 开始游戏
   socket.on('start_game', () => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
-      return;
-    }
+    if (!currentRoomCode) return;
 
     const result = roomModule.startGame(currentRoomCode);
 
@@ -228,21 +321,14 @@ io.on('connection', (socket) => {
     console.log(`游戏开始: ${currentRoomCode}`);
   });
 
-  // 投骰子
+  // 投骰子 - 单棋子逻辑
   socket.on('roll_dice', () => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
-      return;
-    }
+    if (!currentRoomCode) return;
 
     const room = roomModule.getRoom(currentRoomCode);
-    if (!room) {
-      socket.emit('error', { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
-      return;
-    }
+    if (!room) return;
 
-    roomModule.updatePlayerActivity(currentPlayerId);
-    const result = gameModule.doRollDice(room, currentPlayerId);
+    const result = gameModule.executeTurn(currentRoomCode, currentPlayerId);
 
     if (!result.success) {
       socket.emit('error', { code: 'ROLL_FAILED', message: result.error });
@@ -251,97 +337,73 @@ io.on('connection', (socket) => {
 
     io.to(currentRoomCode).emit('dice_result', {
       diceValue: result.diceValue,
-      playerId: result.playerId,
-      movablePieces: result.movablePieces,
-      turnChange: result.turnChange,
-      nextPlayerId: result.nextPlayerId
+      playerId: currentPlayerId,
+      canMove: result.canMove,
+      moveHint: result.moveHint,
+      room: gameModule.getGameState(result.room)
     });
-
-    // 如果没有可移动的棋子且没有切换回合，投骰子结果会触发任务或直接结束回合
-    if (!result.turnChange && result.movablePieces.length === 0) {
-      // 自动结束回合
-      io.to(currentRoomCode).emit('turn_change', {
-        currentPlayerId: result.nextPlayerId
-      });
-    }
   });
 
-  // 移动棋子
+  // 移动棋子 - 单棋子逻辑
   socket.on('move_piece', (data) => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
-      return;
-    }
+    if (!currentRoomCode) return;
 
-    const { pieceIndex } = data;
-    const room = roomModule.getRoom(currentRoomCode);
-    if (!room) {
-      socket.emit('error', { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
-      return;
-    }
-
-    roomModule.updatePlayerActivity(currentPlayerId);
-    const result = gameModule.movePiece(room, currentPlayerId, pieceIndex);
+    const pieceIndex = (data && data.pieceIndex) || 0;
+    const result = gameModule.movePiece(currentRoomCode, currentPlayerId, pieceIndex);
 
     if (!result.success) {
       socket.emit('error', { code: 'MOVE_FAILED', message: result.error });
       return;
     }
 
-    // 检查是否触发任务
-    let taskTriggered = null;
-    const taskPackage = taskModule.loadTaskPackage(room.taskPackageId);
-    const task = gameModule.getTaskForPosition(result.newPosition, taskPackage);
-
-    if (task && !result.finished) {
-      room.taskPending = task;
-      room.pendingPlayerIndex = room.players.findIndex(p => p.id === currentPlayerId);
-      taskTriggered = task;
-    }
-
     io.to(currentRoomCode).emit('piece_moved', {
-      playerId: result.playerId,
-      pieceIndex: result.pieceIndex,
-      oldPosition: result.oldPosition,
-      newPosition: result.newPosition,
-      eatenPiece: result.eatenPiece,
-      finished: result.finished,
-      task: taskTriggered
+      playerId: currentPlayerId,
+      pieceIndex: 0,
+      oldPosition: result.from,
+      newPosition: result.to,
+      task: result.task,
+      taskResult: result.taskResult,
+      moved: result.moved,
+      room: gameModule.getGameState(result.room)
     });
 
-    if (taskTriggered) {
+    // 触发任务事件
+    if (result.task) {
       io.to(currentRoomCode).emit('task_triggered', {
-        task: taskTriggered,
+        task: result.task,
         playerId: currentPlayerId,
-        position: result.newPosition
+        position: result.to
       });
     }
 
-    // 如果游戏结束
-    if (room.gameState === 'finished') {
+    // 游戏结束
+    const rawRoom = roomModule._getRawRoom(currentRoomCode);
+    if (rawRoom && rawRoom.gameState === 'finished') {
       io.to(currentRoomCode).emit('game_over', {
-        winnerId: room.winner,
-        room: gameModule.getGameState(room)
+        winnerId: rawRoom.winner ? rawRoom.winner.id : currentPlayerId,
+        room: gameModule.getGameState(rawRoom)
       });
     }
   });
 
-  // 任务回答
+  // 任务回答 (选择题)
   socket.on('task_answer', (data) => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
-      return;
-    }
+    if (!currentRoomCode) return;
 
     const { answer } = data;
-    const room = roomModule.getRoom(currentRoomCode);
-    if (!room || !room.taskPending) {
-      socket.emit('error', { code: 'NO_TASK', message: '没有待处理的任务' });
-      return;
+    const room = roomModule._getRawRoom(currentRoomCode);
+    if (!room || !room.taskPending) return;
+
+    const task = room.taskPending;
+    let success = false;
+
+    if (task.type === 'question') {
+      success = (answer === task.answer);
+    } else if (task.type === 'action' || task.type === 'challenge' || task.type === 'luck') {
+      success = true; // 动作/挑战/运气任务按完成处理
     }
 
-    roomModule.updatePlayerActivity(currentPlayerId);
-    const result = gameModule.completeTask(room, currentPlayerId, { answer });
+    const result = gameModule.completeTask(currentRoomCode, currentPlayerId, success);
 
     if (!result.success) {
       socket.emit('error', { code: 'TASK_FAILED', message: result.error });
@@ -350,37 +412,19 @@ io.on('connection', (socket) => {
 
     io.to(currentRoomCode).emit('task_result', {
       playerId: currentPlayerId,
-      taskSuccess: result.taskSuccess,
-      message: result.message,
-      extraTurn: result.extraTurn,
-      skipTurn: result.skipTurn,
-      nextPlayerId: result.nextPlayerId
+      taskSuccess: success,
+      reward: result.reward,
+      newPosition: result.newPosition,
+      message: success ? '任务完成!' : '任务失败',
+      room: gameModule.getGameState(result.room)
     });
-
-    // 如果需要切换回合
-    if (result.skipTurn || !result.extraTurn) {
-      io.to(currentRoomCode).emit('turn_change', {
-        currentPlayerId: result.nextPlayerId
-      });
-    }
   });
 
   // 任务动作完成
-  socket.on('task_action', (data) => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
-      return;
-    }
+  socket.on('task_action', () => {
+    if (!currentRoomCode) return;
 
-    const room = roomModule.getRoom(currentRoomCode);
-    if (!room || !room.taskPending) {
-      socket.emit('error', { code: 'NO_TASK', message: '没有待处理的任务' });
-      return;
-    }
-
-    roomModule.updatePlayerActivity(currentPlayerId);
-    const result = gameModule.completeTask(room, currentPlayerId, { actionDone: true });
-
+    const result = gameModule.completeTask(currentRoomCode, currentPlayerId, true);
     if (!result.success) {
       socket.emit('error', { code: 'TASK_FAILED', message: result.error });
       return;
@@ -388,64 +432,63 @@ io.on('connection', (socket) => {
 
     io.to(currentRoomCode).emit('task_result', {
       playerId: currentPlayerId,
-      taskSuccess: result.taskSuccess,
-      message: result.message,
-      extraTurn: result.extraTurn,
-      skipTurn: result.skipTurn,
-      nextPlayerId: result.nextPlayerId
+      taskSuccess: true,
+      reward: result.reward,
+      newPosition: result.newPosition,
+      message: '任务完成!',
+      room: gameModule.getGameState(result.room)
     });
-
-    if (result.skipTurn || !result.extraTurn) {
-      io.to(currentRoomCode).emit('turn_change', {
-        currentPlayerId: result.nextPlayerId
-      });
-    }
   });
 
-  // 挑战任务指定目标
-  socket.on('task_challenge_target', (data) => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
+  // 跳过任务 (有惩罚)
+  socket.on('skip_task', () => {
+    if (!currentRoomCode) return;
+
+    const result = gameModule.skipTask(currentRoomCode, currentPlayerId);
+
+    if (!result.success) {
+      socket.emit('error', { code: 'SKIP_FAILED', message: result.error });
       return;
     }
 
-    const { targetPlayerId } = data;
-    const room = roomModule.getRoom(currentRoomCode);
-    if (!room || !room.taskPending) {
-      socket.emit('error', { code: 'NO_TASK', message: '没有待处理的任务' });
+    io.to(currentRoomCode).emit('task_result', {
+      playerId: currentPlayerId,
+      taskSuccess: false,
+      message: result.message,
+      newPosition: result.newPosition,
+      room: gameModule.getGameState(result.room)
+    });
+  });
+
+  // 回合超时
+  socket.on('turn_timeout', () => {
+    if (!currentRoomCode) return;
+
+    const result = gameModule.handleTurnTimeout(currentRoomCode);
+    if (!result.success) return;
+
+    io.to(currentRoomCode).emit('turn_change', {
+      timedOut: true,
+      nextPlayerId: result.nextPlayer ? result.nextPlayer.id : null,
+      room: gameModule.getGameState(result.room)
+    });
+  });
+
+  // 结束回合
+  socket.on('end_turn', () => {
+    if (!currentRoomCode) return;
+
+    const result = gameModule.endTurn(currentRoomCode, currentPlayerId);
+
+    if (!result.success) {
+      socket.emit('error', { code: 'END_TURN_FAILED', message: result.error });
       return;
     }
 
-    roomModule.updatePlayerActivity(currentPlayerId);
-
-    // 处理挑战任务
-    const task = room.taskPending;
-    if (task.type === 'challenge' && task.target) {
-      // 与目标玩家互动
-      const targetPlayer = room.players.find(p => p.id === targetPlayerId);
-      if (!targetPlayer) {
-        socket.emit('error', { code: 'TARGET_NOT_FOUND', message: '目标玩家不存在' });
-        return;
-      }
-
-      const result = gameModule.completeTask(room, currentPlayerId, { targetPlayerId });
-      if (result.success) {
-        io.to(currentRoomCode).emit('task_result', {
-          playerId: currentPlayerId,
-          taskSuccess: result.taskSuccess,
-          message: result.message + ` (与 ${targetPlayer.name})`,
-          extraTurn: result.extraTurn,
-          skipTurn: result.skipTurn,
-          nextPlayerId: result.nextPlayerId
-        });
-
-        if (result.skipTurn || !result.extraTurn) {
-          io.to(currentRoomCode).emit('turn_change', {
-            currentPlayerId: result.nextPlayerId
-          });
-        }
-      }
-    }
+    io.to(currentRoomCode).emit('turn_change', {
+      nextPlayerId: result.nextPlayer ? result.nextPlayer.id : null,
+      room: gameModule.getGameState(result.room)
+    });
   });
 
   // 聊天消息
@@ -455,15 +498,8 @@ io.on('connection', (socket) => {
     const { message } = data;
     const filteredMessage = filterSensitiveWords(message);
 
-    if (!filteredMessage || filteredMessage.trim().length === 0) {
-      socket.emit('error', { code: 'INVALID_MESSAGE', message: '消息不能为空' });
-      return;
-    }
-
-    if (filteredMessage.length > 50) {
-      socket.emit('error', { code: 'MESSAGE_TOO_LONG', message: '消息不能超过50字' });
-      return;
-    }
+    if (!filteredMessage || filteredMessage.trim().length === 0) return;
+    if (filteredMessage.length > 100) return;
 
     const room = roomModule.getRoom(currentRoomCode);
     if (!room) return;
@@ -482,16 +518,10 @@ io.on('connection', (socket) => {
 
   // 获取房间状态
   socket.on('get_room_state', () => {
-    if (!currentRoomCode) {
-      socket.emit('error', { code: 'NOT_IN_ROOM', message: '未加入房间' });
-      return;
-    }
+    if (!currentRoomCode) return;
 
     const room = roomModule.getRoom(currentRoomCode);
-    if (!room) {
-      socket.emit('error', { code: 'ROOM_NOT_FOUND', message: '房间不存在' });
-      return;
-    }
+    if (!room) return;
 
     socket.emit('room_state', {
       room: gameModule.getGameState(room)
@@ -559,6 +589,12 @@ app.post('/api/task-packages', (req, res) => {
   const taskPackage = req.body;
   const result = taskModule.saveTaskPackage(taskPackage);
   res.json(result);
+});
+
+// 获取公开房间列表
+app.get('/api/rooms/public', (req, res) => {
+  const rooms = roomModule.getPublicRooms();
+  res.json({ success: true, rooms });
 });
 
 // 短码解析

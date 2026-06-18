@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>任务包编辑器 - 飞行棋</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .bg-particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      animation: float 15s infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .btn {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      touch-action: manipulation;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s;
+    }
+    .btn:hover::before { left: 100%; }
+    .btn:active { transform: scale(0.96); }
+    textarea, input, select {
+      background: rgba(15, 12, 41, 0.8);
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: white;
+      width: 100%;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+    textarea:focus, input:focus, select:focus {
+      outline: none;
+      border-color: #a855f7;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+    }
+    textarea::placeholder, input::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 20px;
+      padding-right: 40px;
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* 任务包列表项 */
+    .package-item {
+      padding: 14px 16px;
+      background: rgba(15, 12, 41, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .package-item:hover {
+      border-color: rgba(168, 85, 247, 0.5);
+      background: rgba(15, 12, 41, 0.8);
+      transform: translateX(4px);
+    }
+    .package-item.selected {
+      border-color: #a855f7;
+      background: rgba(168, 85, 247, 0.15);
+    }
+    /* 任务列表项 */
+    .task-item {
+      padding: 12px 14px;
+      background: rgba(15, 12, 41, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+    .task-item:hover {
+      border-color: rgba(168, 85, 247, 0.3);
+      background: rgba(15, 12, 41, 0.8);
+    }
+    /* 类型标签 */
+    .type-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .type-question { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+    .type-action { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .type-challenge { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+    .type-luck { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+    /* Toast */
+    .toast {
+      animation: toast-in 0.3s ease, toast-out 0.3s ease 2.7s forwards;
+    }
+    @keyframes toast-in {
+      from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    @keyframes toast-out {
+      from { transform: translateX(-50%) translateY(0); opacity: 1; }
+      to { transform: translateX(-50%) translateY(100%); opacity: 0; }
+    }
+    /* 弹窗 */
+    .modal-overlay {
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-content {
+      transform: scale(0.9) translateY(20px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .modal-overlay.active .modal-content {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+    /* 空状态 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #9ca3af;
+    }
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.5); border-radius: 3px; }
+  </style>
+</head>
+<body class="text-white">
+  <div class="bg-particles" id="particles"></div>
+
+  <div class="min-h-screen p-4 relative z-10">
+    <div class="max-w-5xl mx-auto">
+      <!-- 头部 -->
+      <div class="flex justify-between items-center mb-6 fade-in">
+        <h1 class="text-2xl font-bold flex items-center gap-3">
+          <span class="text-3xl">📝</span> 任务包编辑器
+        </h1>
+        <a href="index.html" class="btn text-gray-400 hover:text-white flex items-center gap-2 transition-all">
+          <span>←</span> 返回首页
+        </a>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-5">
+        <!-- 左侧：任务包列表 -->
+        <div class="md:col-span-1">
+          <div class="glass-card rounded-2xl p-5 mb-4 fade-in stagger-1">
+            <h3 class="font-bold mb-4 flex items-center gap-2">
+              <span>📦</span> 任务包列表
+            </h3>
+            <div id="package-list" class="space-y-2 max-h-[35vh] overflow-auto mb-4"></div>
+            <button onclick="createNewPackage()" class="btn w-full py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 font-semibold">
+              + 新建任务包
+            </button>
+          </div>
+
+          <div class="space-y-2 fade-in stagger-2">
+            <button onclick="showImport()" class="btn w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 font-semibold flex items-center justify-center gap-2">
+              📥 导入JSON
+            </button>
+            <button onclick="exportCurrent()" class="btn w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-semibold flex items-center justify-center gap-2">
+              📤 导出JSON
+            </button>
+          </div>
+        </div>
+
+        <!-- 右侧：编辑器 -->
+        <div class="md:col-span-2">
+          <div class="glass-card rounded-2xl p-5 fade-in stagger-3">
+            <div id="no-selection" class="empty-state">
+              <div class="empty-state-icon">📋</div>
+              <div class="text-lg mb-2">选择或创建一个任务包</div>
+              <div class="text-sm">开始编辑你的任务包</div>
+            </div>
+
+            <div id="editor-form" class="hidden space-y-5">
+              <!-- 基本信息 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-gray-400 mb-2 text-sm font-medium">📝 名称</label>
+                  <input type="text" id="pkg-name" placeholder="任务包名称" />
+                </div>
+                <div>
+                  <label class="block text-gray-400 mb-2 text-sm font-medium">👤 作者</label>
+                  <input type="text" id="pkg-author" placeholder="作者名称" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-gray-400 mb-2 text-sm font-medium">📄 描述</label>
+                <textarea id="pkg-desc" rows="2" placeholder="任务包描述"></textarea>
+              </div>
+
+              <div class="flex items-center gap-3 text-sm">
+                <span class="text-gray-400">任务数量：</span>
+                <span id="pkg-count" class="font-bold text-purple-400">0</span>
+              </div>
+
+              <!-- 任务列表 -->
+              <div>
+                <div class="flex justify-between items-center mb-3">
+                  <label class="text-gray-400 text-sm font-medium flex items-center gap-2">
+                    <span>📋</span> 任务列表
+                  </label>
+                  <button onclick="addTask()" class="btn bg-blue-600 hover:bg-blue-500 py-2 px-4 rounded-lg text-sm font-semibold">
+                    + 添加任务
+                  </button>
+                </div>
+                <div id="task-list" class="space-y-2 max-h-[35vh] overflow-auto"></div>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="flex gap-3 pt-2">
+                <button onclick="savePackage()" class="btn flex-1 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 font-bold text-lg">
+                  💾 保存
+                </button>
+                <button onclick="deletePackage()" class="btn py-3 px-6 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 font-semibold">
+                  🗑 删除
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 任务编辑弹窗 -->
+  <div id="task-modal" class="modal-overlay fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+    <div class="modal-content glass-card rounded-3xl p-6 w-full max-w-lg">
+      <h3 class="text-xl font-bold mb-5 text-center" id="task-modal-title">✏️ 编辑任务</h3>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-gray-400 mb-2 text-sm font-medium">📌 类型</label>
+          <select id="task-type">
+            <option value="question">❓ 问答题</option>
+            <option value="action">🎯 动作题</option>
+            <option value="challenge">⚡ 挑战题</option>
+            <option value="luck">🎲 运气题</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-gray-400 mb-2 text-sm font-medium">📝 内容/问题</label>
+          <textarea id="task-content" rows="2" placeholder="输入问题或任务内容"></textarea>
+        </div>
+
+        <div id="options-section">
+          <label class="block text-gray-400 mb-2 text-sm font-medium">🔘 选项 (用 | 分隔)</label>
+          <input type="text" id="task-options" placeholder="选项A | 选项B | 选项C | 选项D" />
+        </div>
+
+        <div id="answer-section">
+          <label class="block text-gray-400 mb-2 text-sm font-medium">✅ 正确答案 (0=A, 1=B, ...)</label>
+          <input type="number" id="task-answer" min="0" max="3" placeholder="0" />
+        </div>
+
+        <div id="desc-section" class="hidden">
+          <label class="block text-gray-400 mb-2 text-sm font-medium">📖 动作描述</label>
+          <textarea id="task-desc" rows="2" placeholder="描述要完成的动作"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-gray-400 mb-2 text-sm font-medium">🎁 奖励 (前进步数)</label>
+            <input type="number" id="task-reward" value="2" />
+          </div>
+          <div>
+            <label class="block text-gray-400 mb-2 text-sm font-medium">⚠️ 惩罚 (后退步数)</label>
+            <input type="number" id="task-penalty" value="-2" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button onclick="saveTask()" class="btn flex-1 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 font-semibold">
+          ✓ 保存
+        </button>
+        <button onclick="closeTaskModal()" class="btn py-3 px-6 rounded-xl bg-gray-600 hover:bg-gray-500 font-semibold">
+          取消
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入弹窗 -->
+  <div id="import-modal" class="modal-overlay fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+    <div class="modal-content glass-card rounded-3xl p-6 w-full max-w-lg">
+      <h3 class="text-xl font-bold mb-5 text-center">📥 导入任务包JSON</h3>
+      <textarea id="import-json" rows="10" placeholder="粘贴JSON内容..." class="font-mono text-sm"></textarea>
+      <div class="flex gap-3 mt-6">
+        <button onclick="doImport()" class="btn flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 font-semibold">
+          ✓ 导入
+        </button>
+        <button onclick="closeImportModal()" class="btn py-3 px-6 rounded-xl bg-gray-600 hover:bg-gray-500 font-semibold">
+          取消
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 hidden z-50">
+    <div class="toast bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl font-semibold">
+    </div>
+  </div>
+
+  <script>
+    // 生成背景粒子
+    function createParticles() {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 15; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 15 + 's';
+        particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+        container.appendChild(particle);
+      }
+    }
+    createParticles();
+
+    let packages = [];
+    let currentPkg = null;
+    let currentTaskIndex = null;
+
+    async function loadPackages() {
+      const res = await fetch('/api/task-packages');
+      const data = await res.json();
+      if (data.success) {
+        packages = data.packages;
+        renderPackageList();
+      }
+    }
+
+    function renderPackageList() {
+      const list = document.getElementById('package-list');
+      if (packages.length === 0) {
+        list.innerHTML = '<div class="text-gray-500 text-center py-4">暂无任务包</div>';
+        return;
+      }
+      list.innerHTML = packages.map((pkg, i) => `
+        <div class="package-item ${pkg.id === currentPkg?.id ? 'selected' : ''}" onclick="selectPackage(${i})">
+          <div class="font-semibold flex items-center gap-2">
+            <span>📦</span> ${pkg.name}
+          </div>
+          <div class="text-xs text-gray-400 mt-1 flex items-center gap-2">
+            <span>${pkg.author || '未知'}</span>
+            <span>·</span>
+            <span>${pkg.tasks?.length || 0}个任务</span>
+            ${pkg.id === 'default' ? '<span class="text-purple-400">· 内置</span>' : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function selectPackage(index) {
+      currentPkg = packages[index];
+      document.getElementById('no-selection').classList.add('hidden');
+      document.getElementById('editor-form').classList.remove('hidden');
+      document.getElementById('pkg-name').value = currentPkg.name;
+      document.getElementById('pkg-author').value = currentPkg.author || '';
+      document.getElementById('pkg-desc').value = currentPkg.description || '';
+      document.getElementById('pkg-count').value = currentPkg.tasks?.length || 0;
+      renderTaskList();
+      renderPackageList();
+    }
+
+    function renderTaskList() {
+      const list = document.getElementById('task-list');
+      if (!currentPkg?.tasks || currentPkg.tasks.length === 0) {
+        list.innerHTML = '<div class="text-gray-500 text-center py-6">暂无任务，点击添加</div>';
+        return;
+      }
+      list.innerHTML = currentPkg.tasks.map((task, i) => `
+        <div class="task-item flex items-center gap-3">
+          <span class="text-gray-500 text-sm w-6">${i + 1}</span>
+          <span class="flex-1 truncate text-sm">${task.content || task.challenge || task.luck || '任务'}</span>
+          <span class="type-badge ${getTaskTypeClass(task.type)}">${getTaskTypeName(task.type)}</span>
+          <button onclick="editTask(${i})" class="text-blue-400 text-sm hover:text-blue-300">编辑</button>
+          <button onclick="deleteTask(${i})" class="text-red-400 text-sm hover:text-red-300">删除</button>
+        </div>
+      `).join('');
+      document.getElementById('pkg-count').value = currentPkg.tasks.length;
+    }
+
+    function getTaskTypeClass(type) {
+      const map = { question: 'type-question', action: 'type-action', challenge: 'type-challenge', luck: 'type-luck' };
+      return map[type] || 'type-question';
+    }
+
+    function getTaskTypeName(type) {
+      const map = { question: '问答', action: '动作', challenge: '挑战', luck: '运气' };
+      return map[type] || type;
+    }
+
+    function createNewPackage() {
+      const name = prompt('输入任务包名称：');
+      if (!name) return;
+      currentPkg = {
+        id: 'pkg_' + Date.now(),
+        name: name,
+        author: '',
+        description: '',
+        tasks: []
+      };
+      packages.push(currentPkg);
+      renderPackageList();
+      selectPackage(packages.length - 1);
+    }
+
+    function addTask() {
+      if (!currentPkg) return;
+      currentTaskIndex = currentPkg.tasks.length;
+      currentPkg.tasks.push({
+        type: 'question',
+        content: '',
+        options: ['A', 'B', 'C', 'D'],
+        answer: 0,
+        reward: 2,
+        penalty: -2
+      });
+      renderTaskList();
+      editTask(currentPkg.tasks.length - 1);
+    }
+
+    function editTask(index) {
+      currentTaskIndex = index;
+      const task = currentPkg.tasks[index];
+
+      document.getElementById('task-type').value = task.type;
+      document.getElementById('task-content').value = task.content || '';
+      document.getElementById('task-options').value = (task.options || []).join(' | ');
+      document.getElementById('task-answer').value = task.answer || 0;
+      document.getElementById('task-desc').value = task.description || '';
+      document.getElementById('task-reward').value = task.reward || 2;
+      document.getElementById('task-penalty').value = task.penalty || -2;
+
+      updateTaskModalFields();
+      document.getElementById('task-modal').classList.add('active');
+    }
+
+    function updateTaskModalFields() {
+      const type = document.getElementById('task-type').value;
+      document.getElementById('options-section').classList.toggle('hidden', type !== 'question');
+      document.getElementById('answer-section').classList.toggle('hidden', type !== 'question');
+      document.getElementById('desc-section').classList.toggle('hidden', type !== 'action');
+    }
+
+    document.getElementById('task-type').addEventListener('change', updateTaskModalFields);
+
+    function saveTask() {
+      const task = currentPkg.tasks[currentTaskIndex];
+      task.type = document.getElementById('task-type').value;
+      task.content = document.getElementById('task-content').value;
+      task.options = document.getElementById('task-options').value.split('|').map(s => s.trim()).filter(Boolean);
+      task.answer = parseInt(document.getElementById('task-answer').value) || 0;
+      task.description = document.getElementById('task-desc').value;
+      task.reward = parseInt(document.getElementById('task-reward').value) || 2;
+      task.penalty = parseInt(document.getElementById('task-penalty').value) || -2;
+
+      closeTaskModal();
+      renderTaskList();
+    }
+
+    function deleteTask(index) {
+      if (!confirm('确定删除这个任务？')) return;
+      currentPkg.tasks.splice(index, 1);
+      renderTaskList();
+    }
+
+    function closeTaskModal() {
+      document.getElementById('task-modal').classList.remove('active');
+    }
+
+    async function savePackage() {
+      if (!currentPkg || currentPkg.id === 'default') {
+        showToast('内置任务包不能修改');
+        return;
+      }
+
+      currentPkg.name = document.getElementById('pkg-name').value;
+      currentPkg.author = document.getElementById('pkg-author').value;
+      currentPkg.description = document.getElementById('pkg-desc').value;
+
+      const res = await fetch('/api/task-packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentPkg)
+      });
+      const data = await res.json();
+      if (data.success) {
+        currentPkg.id = data.id;
+        showToast('✓ 保存成功');
+        loadPackages();
+      } else {
+        showToast('✗ 保存失败');
+      }
+    }
+
+    async function deletePackage() {
+      if (!currentPkg || currentPkg.id === 'default') {
+        showToast('内置任务包不能删除');
+        return;
+      }
+      if (!confirm('确定删除这个任务包？')) return;
+      showToast('功能开发中');
+    }
+
+    function showImport() {
+      document.getElementById('import-json').value = '';
+      document.getElementById('import-modal').classList.add('active');
+    }
+
+    function closeImportModal() {
+      document.getElementById('import-modal').classList.remove('active');
+    }
+
+    async function doImport() {
+      const json = document.getElementById('import-json').value;
+      if (!json) return;
+
+      const res = await fetch('/api/task-packages/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ json })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✓ 导入成功');
+        closeImportModal();
+        loadPackages();
+      } else {
+        showToast('✗ ' + (data.error || '导入失败'));
+      }
+    }
+
+    function exportCurrent() {
+      if (!currentPkg) {
+        showToast('请先选择一个任务包');
+        return;
+      }
+      const json = JSON.stringify(currentPkg, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `task-package-${currentPkg.name}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✓ 已导出');
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerHTML = `<div class="toast bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl font-semibold">${msg}</div>`;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2000);
+    }
+
+    // 点击弹窗背景关闭
+    ['task-modal', 'import-modal'].forEach(id => {
+      document.getElementById(id).addEventListener('click', (e) => {
+        if (e.target === document.getElementById(id)) {
+          document.getElementById(id).classList.remove('active');
+        }
+      });
+    });
+
+    loadPackages();
+  </script>
+</body>
+</html>

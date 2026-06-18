@@ -120,53 +120,81 @@ function generateDefaultTasks() {
     { challenge: '选一名玩家互相夸赞三句', target: 1 }
   ];
 
-  // 为52个格子分配任务 (除起点格外，每格一个任务)
-  for (let i = 1; i <= 52; i++) {
-    const taskIndex = (i - 1) % 52;
+  // 为52个格子分配任务: positions 0-51
+  for (let pos = 0; pos < 52; pos++) {
     let task;
+    let difficulty = 'easy';
+    let reward = 2;
+    let penalty = -2;
 
-    // 混合不同类型任务
-    if (taskIndex < 40) {
-      // 40个格子放问答
-      const qIndex = taskIndex % questions.length;
-      const q = questions[qIndex];
+    // 根据位置设置难度
+    if (pos >= 35) {
+      difficulty = 'hard';
+      reward = 3;
+      penalty = -3;
+    } else if (pos >= 20) {
+      difficulty = 'normal';
+      reward = 2;
+      penalty = -2;
+    } else {
+      difficulty = 'easy';
+      reward = 1;
+      penalty = -1;
+    }
+
+    // 混合不同类型任务 - 每格一个任务
+    if (pos < 20) {
+      // 20个 easy 格子放问答
+      const q = questions[pos % questions.length];
       task = {
-        position: i,
+        position: pos,
         type: 'question',
         content: q.q,
         options: q.options,
         answer: q.answer,
-        timeLimit: 30
+        timeLimit: 30,
+        difficulty: difficulty,
+        reward: reward,
+        penalty: penalty
       };
-    } else if (taskIndex < 48) {
-      // 8个格子放动作
-      const aIndex = (taskIndex - 40) % actionTasks.length;
-      const a = actionTasks[aIndex];
+    } else if (pos < 35) {
+      // 15个 normal 格子放动作
+      const a = actionTasks[(pos - 20) % actionTasks.length];
       task = {
-        position: i,
+        position: pos,
         type: 'action',
         content: a.action,
         description: a.description,
-        timeLimit: 60
+        timeLimit: 60,
+        difficulty: difficulty,
+        reward: reward,
+        penalty: penalty
       };
-    } else if (taskIndex < 50) {
-      // 2个格子放运气
-      const lIndex = (taskIndex - 48) % luckTasks.length;
+    } else if (pos < 45) {
+      // 10个 hard 格子放挑战/动作
+      const c = challengeTasks[(pos - 35) % challengeTasks.length];
       task = {
-        position: i,
-        type: 'luck',
-        content: luckTasks[lIndex].luck,
-        ...luckTasks[lIndex]
+        position: pos,
+        type: 'challenge',
+        content: c.challenge,
+        target: c.target,
+        timeLimit: 60,
+        difficulty: difficulty,
+        reward: reward,
+        penalty: penalty
       };
     } else {
-      // 2个格子放挑战
-      const cIndex = (taskIndex - 50) % challengeTasks.length;
+      // 7个位置放运气
+      const l = luckTasks[(pos - 45) % luckTasks.length];
       task = {
-        position: i,
-        type: 'challenge',
-        content: challengeTasks[cIndex].challenge,
-        target: challengeTasks[cIndex].target,
-        timeLimit: 60
+        position: pos,
+        type: 'luck',
+        content: l.luck,
+        ...l,
+        timeLimit: 20,
+        difficulty: difficulty,
+        reward: reward,
+        penalty: penalty
       };
     }
 
@@ -174,6 +202,24 @@ function generateDefaultTasks() {
   }
 
   return tasks;
+}
+
+// 根据位置获取任务
+function getTaskByPosition(position, packageId = 'default') {
+  const pkg = loadTaskPackage(packageId);
+  if (!pkg || !Array.isArray(pkg.tasks)) return null;
+  const task = pkg.tasks.find(t => t.position === position || t.position === position + 1);
+  return task || null;
+}
+
+// 根据ID获取任务 (简化版本)
+function getTaskById(taskId, packageId = 'default') {
+  const pkg = loadTaskPackage(packageId);
+  if (!pkg || !Array.isArray(pkg.tasks)) return null;
+  if (typeof taskId === 'number') {
+    return pkg.tasks[taskId] || null;
+  }
+  return pkg.tasks.find(t => t.id === taskId) || null;
 }
 
 // 加载任务包
@@ -372,5 +418,7 @@ module.exports = {
   listTaskPackages,
   deleteTaskPackage,
   exportTaskPackage,
-  importTaskPackage
+  importTaskPackage,
+  getTaskByPosition,
+  getTaskById
 };
